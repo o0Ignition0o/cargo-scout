@@ -207,8 +207,8 @@ fn get_clippy_lints(clippy_output: &str) -> Vec<Lint> {
 }
 
 fn lines_in_range(span: &Span, diff: &Section) -> bool {
-    span.line_start >= diff.line_start && span.line_start <= diff.line_end ||
-    span.line_end >= diff.line_start && span.line_end <= diff.line_end
+    span.line_start >= diff.line_start && span.line_start <= diff.line_end
+        || span.line_end >= diff.line_start && span.line_end <= diff.line_end
 }
 
 fn get_lints_from_diff(lints: Vec<Lint>, diffs: Vec<Section>) -> Vec<Lint> {
@@ -272,10 +272,7 @@ fn main() -> Result<(), ScoutError> {
                 }
             }
         }
-        println!(
-            "Clippy::pedantic found {} warnings",
-            total_warnings
-        );
+        println!("Clippy::pedantic found {} warnings", total_warnings);
         Err(ScoutError::NotClean)
     }
 }
