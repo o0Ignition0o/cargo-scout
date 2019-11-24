@@ -124,5 +124,3 @@ mod tests {
         assert_eq!(expected_lints, lints(clippy_output));
     }
 }
-
-// ci test
