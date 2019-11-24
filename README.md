@@ -1,6 +1,21 @@
 # cargo-scout
-[![Contributor
-Covenant](https://img.shields.io/badge/Contributor%20Covenant-v1.4%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
+  <p>
+    <a href="CODE_OF_CONDUCT.md">
+      <img src="https://img.shields.io/badge/Contributor%20Covenant-v1.4%20adopted-ff69b4.svg" alt="Contributor Covenant">
+  </a>
+    <a href="https://travis-ci.com/o0Ignition0o/cargo-scout">
+      <img src="https://travis-ci.com/o0Ignition0o/cargo-scout.svg?branch=master" alt="Travis Build Status">
+  </a>
+  <a href="LICENSE-APACHE">
+    <img
+    src="https://img.shields.io/badge/license-apache2-green.svg" alt="MPL 2.0 License">
+  </a>
+  <a href="LICENSE-MIT">
+    <img
+    src="https://img.shields.io/badge/license-mit-blue.svg" alt="MIT License">
+  </a>
+</p>
+
 
 # Leave this world a little better than you found it
 
