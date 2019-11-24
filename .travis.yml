@@ -1,0 +1,12 @@
+language: rust
+rust:
+  - stable
+  - nightly
+env:
+  - RUST_BACKTRACE=1
+before_script:
+  - rustup component add clippy
+script:
+  - cargo clippy -- -D pedantic
+  - cargo test --all
+  
