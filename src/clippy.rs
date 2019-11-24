@@ -94,10 +94,33 @@ pub fn lints(clippy_output: &str) -> Vec<Lint> {
         .filter_map(|line| serde_json::from_str(line).ok())
         .filter(|lint: &Lint| {
             if let Some(m) = &lint.message {
-                m.spans.is_empty()
+                !m.spans.is_empty()
             } else {
                 false
             }
         })
         .collect::<Vec<Lint>>()
+}
+
+mod tests {
+    #[test]
+    fn test_lints() {
+        use crate::clippy::{lints, Lint, Message, Span};
+        let expected_lints = vec![Lint {
+            package_id: "cargo-scout".to_string(),
+            src_path: Some("test/foo/bar.rs".to_string()),
+            message: Some(Message {
+                rendered: "this is a test lint".to_string(),
+                spans: vec![Span {
+                    file_name: "test/foo/baz.rs".to_string(),
+                    line_start: 10,
+                    line_end: 12,
+                }],
+            }),
+        }];
+
+        let clippy_output = r#"{"package_id": "cargo-scout","src_path": "test/foo/bar.rs","message": { "rendered": "this is a test lint","spans": [{"file_name": "test/foo/baz.rs","line_start": 10,"line_end": 12}]}}"#;
+
+        assert_eq!(expected_lints, lints(clippy_output));
+    }
 }
