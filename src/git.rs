@@ -68,10 +68,10 @@ impl Parser {
         if self.verbose {
             println!("{}", String::from_utf8(cmd_output.stdout.clone())?);
         }
-        if !cmd_output.status.success() {
-            Err(String::from_utf8(cmd_output.stderr)?.into())
-        } else {
+        if cmd_output.status.success() {
             Ok(String::from_utf8(cmd_output.stdout)?)
+        } else {
+            Err(String::from_utf8(cmd_output.stderr)?.into())
         }
     }
 
@@ -119,9 +119,9 @@ impl Parser {
 }
 
 mod tests {
-    use crate::git::{Parser, Section};
     #[test]
     fn test_empty_diff() {
+        use crate::git::{Parser, Section};
         // Setup
         let diff = r#""#;
         let expected_sections: Vec<Section> = vec![];
@@ -134,6 +134,7 @@ mod tests {
 
     #[test]
     fn test_simple_diff() {
+        use crate::git::{Parser, Section};
         // Setup
         let diff = std::fs::read_to_string("test_files/git/one_diff.patch").unwrap();
         let expected_sections: Vec<Section> = vec![
@@ -157,6 +158,7 @@ mod tests {
 
     #[test]
     fn test_diff_several_files() {
+        use crate::git::{Parser, Section};
         // Setup
         let diff = std::fs::read_to_string("test_files/git/diff_several_files.patch").unwrap();
         let expected_sections: Vec<Section> = vec![
