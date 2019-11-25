@@ -1,0 +1,88 @@
+diff --git a/src/clippy.rs b/src/clippy.rs
+index f394397..e6e05e9 100644
+--- a/src/clippy.rs
++++ b/src/clippy.rs
+@@ -124,3 +124,5 @@ mod tests {
+         assert_eq!(expected_lints, lints(clippy_output));
+     }
+ }
++
++// this is a test
+diff --git a/src/git.rs b/src/git.rs
+index c5efb81..5926057 100644
+--- a/src/git.rs
++++ b/src/git.rs
+@@ -4,7 +4,7 @@ pub struct Parser {
+     verbose: bool,
+ }
+ 
+-#[derive(Debug)]
++#[derive(Debug, PartialEq)]
+ pub struct Section {
+     pub file_name: String,
+     pub line_start: i32,
+@@ -117,3 +117,64 @@ impl Parser {
+         sections
+     }
+ }
++
++mod tests {
++    use crate::git::{Parser, Section};
++    #[test]
++    fn test_empty_diff() {
++        // Setup
++        let diff = r#""#;
++        let expected_sections: Vec<Section> = vec![];
++        let parser = Parser::new(false);
++        // Run
++        let actual_sections = parser.sections(diff);
++        // Assert
++        assert_eq!(expected_sections, actual_sections);
++    }
++
++    #[test]
++    fn test_simple_diff() {
++        // Setup
++        let diff = std::fs::read_to_string("test_files/git/one_diff.patch").unwrap();
++        let expected_sections: Vec<Section> = vec![
++            Section {
++                file_name: "src/git.rs".to_string(),
++                line_start: 4,
++                line_end: 11,
++            },
++            Section {
++                file_name: "src/git.rs".to_string(),
++                line_start: 117,
++                line_end: 147,
++            },
++        ];
++        let parser = Parser::new(false);
++        // Run
++        let actual_sections = parser.sections(&diff);
++        // Assert
++        assert_eq!(expected_sections, actual_sections);
++    }
++
++    #[test]
++    fn test_diff_several_files() {
++        // Setup
++        let diff = std::fs::read_to_string("test_files/git/one_diff.patch").unwrap();
++        let expected_sections: Vec<Section> = vec![
++            Section {
++                file_name: "src/git.rs".to_string(),
++                line_start: 4,
++                line_end: 11,
++            },
++            Section {
++                file_name: "src/git.rs".to_string(),
++                line_start: 117,
++                line_end: 147,
++            },
++        ];
++        let parser = Parser::new(false);
++        // Run
++        let actual_sections = parser.sections(&diff);
++        // Assert
++        assert_eq!(expected_sections, actual_sections);
++    }
++}

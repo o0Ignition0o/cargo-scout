@@ -1,0 +1,44 @@
+diff --git a/src/git.rs b/src/git.rs
+index c5efb81..764864c 100644
+--- a/src/git.rs
++++ b/src/git.rs
+@@ -4,7 +4,7 @@ pub struct Parser {
+     verbose: bool,
+ }
+ 
+-#[derive(Debug)]
++#[derive(Debug, PartialEq)]
+ pub struct Section {
+     pub file_name: String,
+     pub line_start: i32,
+@@ -117,3 +117,30 @@ impl Parser {
+         sections
+     }
+ }
++
++mod tests {
++    use crate::git::{Parser, Section};
++    #[test]
++    fn test_empty_diff() {
++        // Setup
++        let diff = r#""#;
++        let expected_sections: Vec<Section> = vec![];
++        let parser = Parser::new(false);
++        // Run
++        let actual_sections = parser.sections(diff);
++        // Assert
++        assert_eq!(expected_sections, actual_sections);
++    }
++
++    #[test]
++    fn test_one_diff() {
++        // Setup
++        let diff = r#""#;
++        let expected_sections: Vec<Section> = vec![];
++        let parser = Parser::new(false);
++        // Run
++        let actual_sections = parser.sections(diff);
++        // Assert
++        assert_eq!(expected_sections, actual_sections);
++    }
++}

@@ -4,7 +4,7 @@ pub struct Parser {
     verbose: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Section {
     pub file_name: String,
     pub line_start: i32,
@@ -115,5 +115,71 @@ impl Parser {
             }
         }
         sections
+    }
+}
+
+mod tests {
+    use crate::git::{Parser, Section};
+    #[test]
+    fn test_empty_diff() {
+        // Setup
+        let diff = r#""#;
+        let expected_sections: Vec<Section> = vec![];
+        let parser = Parser::new(false);
+        // Run
+        let actual_sections = parser.sections(diff);
+        // Assert
+        assert_eq!(expected_sections, actual_sections);
+    }
+
+    #[test]
+    fn test_simple_diff() {
+        // Setup
+        let diff = std::fs::read_to_string("test_files/git/one_diff.patch").unwrap();
+        let expected_sections: Vec<Section> = vec![
+            Section {
+                file_name: "src/git.rs".to_string(),
+                line_start: 4,
+                line_end: 11,
+            },
+            Section {
+                file_name: "src/git.rs".to_string(),
+                line_start: 117,
+                line_end: 147,
+            },
+        ];
+        let parser = Parser::new(false);
+        // Run
+        let actual_sections = parser.sections(&diff);
+        // Assert
+        assert_eq!(expected_sections, actual_sections);
+    }
+
+    #[test]
+    fn test_diff_several_files() {
+        // Setup
+        let diff = std::fs::read_to_string("test_files/git/diff_several_files.patch").unwrap();
+        let expected_sections: Vec<Section> = vec![
+            Section {
+                file_name: "src/clippy.rs".to_string(),
+                line_start: 124,
+                line_end: 129,
+            },
+            Section {
+                file_name: "src/git.rs".to_string(),
+                line_start: 4,
+                line_end: 11,
+            },
+            Section {
+                file_name: "src/git.rs".to_string(),
+                line_start: 117,
+                line_end: 181,
+            },
+        ];
+        let parser = Parser::new(false);
+        // Run
+        let actual_sections = parser.sections(&diff);
+        // Assert
+        assert_eq!(expected_sections, actual_sections);
     }
 }
