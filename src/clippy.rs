@@ -102,6 +102,7 @@ pub fn lints(clippy_output: &str) -> Vec<Lint> {
         .collect::<Vec<Lint>>()
 }
 
+#[cfg(test)]
 mod tests {
     #[test]
     fn test_lints() {

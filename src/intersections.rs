@@ -39,6 +39,7 @@ pub fn get_lints_from_diff(
     lints_in_diff
 }
 
+#[cfg(test)]
 mod intersections_tests {
     use crate::clippy::Span;
     use crate::git::Section;
