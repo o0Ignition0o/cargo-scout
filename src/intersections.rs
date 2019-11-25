@@ -39,10 +39,13 @@ pub fn get_lints_from_diff(
     lints_in_diff
 }
 
+#[cfg(test)]
 mod intersections_tests {
     use crate::clippy::Span;
     use crate::git::Section;
     use crate::intersections::files_match;
+
+    type TestSection = (&'static str, i32, i32);
     #[test]
 
     fn test_files_match() {
@@ -73,10 +76,10 @@ mod intersections_tests {
     fn test_lines_in_range_simple() {
         let ranges_to_test = vec![
             (("foo.rs", 1, 10), ("foo.rs", 5, 12)),
-            (("foo.rs", 1, 10), ("foo.rs", 5, 12)),
-            (("foo.rs", 1, 10), ("foo.rs", 5, 12)),
+            (("foo.rs", 1, 10), ("foo.rs", 5, 11)),
+            (("foo.rs", 1, 10), ("foo.rs", 10, 19)),
             (("foo.rs", 1, 10), ("foo.rs", 9, 12)),
-            (("foo.rs", 1, 10), ("foo.rs", 5, 12)),
+            (("foo.rs", 8, 16), ("foo.rs", 5, 12)),
         ];
         assert_all_in_range(ranges_to_test);
     }
@@ -93,7 +96,7 @@ mod intersections_tests {
         assert_all_not_in_range(ranges_to_test);
     }
 
-    fn assert_all_files_match(ranges: Vec<((&str, i32, i32), (&str, i32, i32))>) {
+    fn assert_all_files_match(ranges: Vec<(TestSection, TestSection)>) {
         for range in ranges {
             let lint = range.0;
             let section = range.1;
@@ -114,7 +117,7 @@ mod intersections_tests {
         }
     }
 
-    fn assert_no_files_match(ranges: Vec<((&str, i32, i32), (&str, i32, i32))>) {
+    fn assert_no_files_match(ranges: Vec<(TestSection, TestSection)>) {
         for range in ranges {
             let lint = range.0;
             let section = range.1;
@@ -135,7 +138,7 @@ mod intersections_tests {
         }
     }
 
-    fn assert_all_in_range(ranges: Vec<((&str, i32, i32), (&str, i32, i32))>) {
+    fn assert_all_in_range(ranges: Vec<(TestSection, TestSection)>) {
         for range in ranges {
             let lint = range.0;
             let section = range.1;
@@ -149,7 +152,7 @@ mod intersections_tests {
         }
     }
 
-    fn assert_all_not_in_range(ranges: Vec<((&str, i32, i32), (&str, i32, i32))>) {
+    fn assert_all_not_in_range(ranges: Vec<(TestSection, TestSection)>) {
         for range in ranges {
             let lint = range.0;
             let section = range.1;
