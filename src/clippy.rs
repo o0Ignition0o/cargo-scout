@@ -59,6 +59,8 @@ pub fn clippy(verbose: bool) -> Result<String, crate::error::Error> {
                 "-W",
                 "clippy::pedantic",
             ])
+            .envs(std::env::vars())
+            .env("RUST_BACKTRACE", "full")
             .output()
             .expect("failed to run clippy pedantic")
     } else {
@@ -71,6 +73,7 @@ pub fn clippy(verbose: bool) -> Result<String, crate::error::Error> {
                 "-W",
                 "clippy::pedantic",
             ])
+            .envs(std::env::vars())
             .output()
             .expect("failed to run clippy pedantic")
     };
@@ -82,6 +85,27 @@ pub fn clippy(verbose: bool) -> Result<String, crate::error::Error> {
     }
     if clippy_pedantic_output.status.success() {
         Ok(String::from_utf8(clippy_pedantic_output.stdout)?)
+    } else if verbose {
+        println!("Clippy run failed");
+        println!("cleaning and building with full backtrace");
+        let _ = Command::new("cargo")
+            .args(&["clean"])
+            .envs(std::env::vars())
+            .env("RUST_BACKTRACE", "full")
+            .output()
+            .expect("failed to start cargo clean");
+        let build = Command::new("cargo")
+            .args(&["build"])
+            .envs(std::env::vars())
+            .env("RUST_BACKTRACE", "full")
+            .output()
+            .expect("failed to start cargo build");
+        if build.status.success() {
+            Err(String::from_utf8(build.stdout)?.into())
+        } else {
+            println!("{}", String::from_utf8(build.stdout.clone())?);
+            Err(String::from_utf8(build.stderr)?.into())
+        }
     } else {
         Err(String::from_utf8(clippy_pedantic_output.stderr)?.into())
     }
