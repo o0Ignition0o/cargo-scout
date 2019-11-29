@@ -2,6 +2,9 @@ language: rust
 rust:
   - stable
   - nightly
+matrix:
+  allow_failures:
+    - rust: nightly
 env:
   - RUST_BACKTRACE=1
 before_script:
@@ -9,4 +12,3 @@ before_script:
 script:
   - cargo clippy -- -D pedantic
   - cargo test --all
-  
