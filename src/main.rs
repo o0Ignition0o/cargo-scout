@@ -1,10 +1,30 @@
-extern crate clap;
-use clap::{App, Arg};
+use structopt::StructOpt;
 
 mod clippy;
 mod error;
 mod git;
 mod intersections;
+
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "cargo-scout",
+    author,
+    about = "Leave the codebase better than when you found it."
+)]
+struct Options {
+    #[structopt(short = "v", long = "verbose")]
+    /// Set the verbosity level
+    verbose: bool,
+
+    #[structopt(
+        short = "b",
+        long = "branch",
+        value_name = "branch",
+        default_value = "master"
+    )]
+    /// Set the target branch
+    branch: String,
+}
 
 fn display_warnings(warnings: &[clippy::Lint]) {
     for w in warnings {
@@ -17,38 +37,19 @@ fn display_warnings(warnings: &[clippy::Lint]) {
 }
 
 fn main() -> Result<(), error::Error> {
-    let matches = App::new("cargo-scout")
-        .version("1.0")
-        .author("o0Ignition0o <jeremy.lempereur@gmail.com>")
-        .about("Leave the codebase better than when you found it.")
-        .arg(
-            Arg::with_name("branch")
-                .short("b")
-                .long("branch")
-                .value_name("branch")
-                .help("Set the target branch (default: master)")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .long("verbose")
-                .help("Set the verbosity level"),
-        )
-        .get_matches();
+    let opts = Options::from_args();
 
-    let verbose = matches.is_present("verbose");
-    let target_branch = matches.value_of("branch").unwrap_or("master");
-
-    println!("Getting diff against target {}", target_branch);
+    println!("Getting diff against target {}", opts.branch);
     let diff_sections = git::Parser::new()
-        .set_verbose(verbose)
-        .get_sections(target_branch)?;
+        .set_verbose(opts.verbose)
+        .get_sections(&opts.branch)?;
     println!("Running clippy");
-    let clippy_lints = clippy::Linter::new().set_verbose(verbose).get_lints()?;
+    let clippy_lints = clippy::Linter::new()
+        .set_verbose(opts.verbose)
+        .get_lints()?;
 
     let warnings_caused_by_diff =
-        intersections::get_lints_from_diff(&clippy_lints, &diff_sections, verbose);
+        intersections::get_lints_from_diff(&clippy_lints, &diff_sections, opts.verbose);
     if warnings_caused_by_diff.is_empty() {
         println!("No warnings raised by clippy::pedantic in your diff, you're good to go!");
         Ok(())
