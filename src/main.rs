@@ -41,10 +41,11 @@ fn main() -> Result<(), error::Error> {
     let target_branch = matches.value_of("branch").unwrap_or("master");
 
     println!("Getting diff against target {}", target_branch);
-    let git_parser = git::Parser::new(verbose);
-    let diff_sections = git_parser.get_sections(target_branch)?;
+    let diff_sections = git::Parser::new()
+        .set_verbose(verbose)
+        .get_sections(target_branch)?;
     println!("Running clippy");
-    let clippy_lints = clippy::get_clippy_lints(verbose)?;
+    let clippy_lints = clippy::Linter::new().set_verbose(verbose).get_lints()?;
 
     let warnings_caused_by_diff =
         intersections::get_lints_from_diff(&clippy_lints, &diff_sections, verbose);

@@ -52,8 +52,13 @@ impl SectionBuilder {
 }
 
 impl Parser {
-    pub fn new(verbose: bool) -> Self {
-        Self { verbose }
+    pub fn new() -> Self {
+        Self { verbose: false }
+    }
+
+    pub fn set_verbose(&mut self, verbose: bool) -> &mut Self {
+        self.verbose = verbose;
+        self
     }
 
     pub fn get_sections(&self, target_branch: &str) -> Result<Vec<Section>, crate::error::Error> {
@@ -121,18 +126,30 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn test_set_verbose() {
+        use crate::git::Parser;
+
+        let mut parser = Parser::new();
+        assert_eq!(false, parser.verbose);
+
+        let p2 = parser.set_verbose(true);
+        assert_eq!(true, p2.verbose);
+
+        let p3 = p2.set_verbose(false);
+        assert_eq!(false, p3.verbose);
+    }
+    #[test]
     fn test_empty_diff() {
         use crate::git::{Parser, Section};
         // Setup
         let diff = r#""#;
         let expected_sections: Vec<Section> = vec![];
-        let parser = Parser::new(false);
+        let parser = Parser::new();
         // Run
         let actual_sections = parser.sections(diff);
         // Assert
         assert_eq!(expected_sections, actual_sections);
     }
-
     #[test]
     fn test_simple_diff() {
         use crate::git::{Parser, Section};
@@ -150,13 +167,12 @@ mod tests {
                 line_end: 147,
             },
         ];
-        let parser = Parser::new(false);
+        let parser = Parser::new();
         // Run
         let actual_sections = parser.sections(&diff);
         // Assert
         assert_eq!(expected_sections, actual_sections);
     }
-
     #[test]
     fn test_diff_several_files() {
         use crate::git::{Parser, Section};
@@ -179,7 +195,7 @@ mod tests {
                 line_end: 181,
             },
         ];
-        let parser = Parser::new(false);
+        let parser = Parser::new();
         // Run
         let actual_sections = parser.sections(&diff);
         // Assert
