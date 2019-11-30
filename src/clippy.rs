@@ -61,36 +61,29 @@ impl Linter {
         self.clippy().map(|output| lints(&output))
     }
 
+    fn get_command_parameters(&self) -> Vec<&str> {
+        let mut params = vec!["clippy", "--message-format", "json"];
+        if self.verbose {
+            params.push("--verbose");
+        }
+        params.append(&mut vec!["--", "-W", "clippy::pedantic"]);
+        params
+    }
+
+    fn get_envs(&self) -> Vec<(&str, &str)> {
+        let mut envs = vec![];
+        if self.verbose {
+            envs.push(("RUST_BACKTRACE", "full"));
+        }
+        envs
+    }
+
     fn clippy(&self) -> Result<String, crate::error::Error> {
-        let clippy_pedantic_output = if self.verbose {
-            Command::new("cargo")
-                .args(&[
-                    "clippy",
-                    "--verbose",
-                    "--message-format",
-                    "json",
-                    "--",
-                    "-W",
-                    "clippy::pedantic",
-                ])
-                .envs(std::env::vars())
-                .env("RUST_BACKTRACE", "full")
-                .output()
-                .expect("failed to run clippy pedantic")
-        } else {
-            Command::new("cargo")
-                .args(&[
-                    "clippy",
-                    "--message-format",
-                    "json",
-                    "--",
-                    "-W",
-                    "clippy::pedantic",
-                ])
-                .envs(std::env::vars())
-                .output()
-                .expect("failed to run clippy pedantic")
-        };
+        let clippy_pedantic_output = Command::new("cargo")
+            .args(self.get_command_parameters())
+            .envs(self.get_envs())
+            .output()
+            .expect("failed to run clippy pedantic");
         if self.verbose {
             println!(
                 "{}",
@@ -104,14 +97,12 @@ impl Linter {
             println!("cleaning and building with full backtrace");
             let _ = Command::new("cargo")
                 .args(&["clean"])
-                .envs(std::env::vars())
-                .env("RUST_BACKTRACE", "full")
+                .envs(self.get_envs())
                 .output()
                 .expect("failed to start cargo clean");
             let build = Command::new("cargo")
                 .args(&["build"])
-                .envs(std::env::vars())
-                .env("RUST_BACKTRACE", "full")
+                .envs(self.get_envs())
                 .output()
                 .expect("failed to start cargo build");
             if build.status.success() {
@@ -155,6 +146,49 @@ mod tests {
 
         let l3 = l2.set_verbose(false);
         assert_eq!(false, l3.verbose);
+    }
+    #[test]
+    fn test_get_envs() {
+        use crate::clippy::Linter;
+
+        let mut linter = Linter::new();
+        let mut expected_envs = vec![];
+        assert_eq!(expected_envs, linter.get_envs());
+
+        let verbose_linter = linter.set_verbose(true);
+        expected_envs.push(("RUST_BACKTRACE", "full"));
+        assert_eq!(expected_envs, verbose_linter.get_envs());
+    }
+    #[test]
+    fn test_get_command_parameters() {
+        use crate::clippy::Linter;
+
+        let mut linter = Linter::new();
+        let expected_command_parameters = vec![
+            "clippy",
+            "--message-format",
+            "json",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+
+        assert_eq!(expected_command_parameters, linter.get_command_parameters());
+
+        let verbose_linter = linter.set_verbose(true);
+        let verbose_expected_command_parameters = vec![
+            "clippy",
+            "--message-format",
+            "json",
+            "--verbose",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            verbose_expected_command_parameters,
+            verbose_linter.get_command_parameters()
+        );
     }
     #[test]
     fn test_lints() {
