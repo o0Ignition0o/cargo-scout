@@ -16,6 +16,9 @@ struct Options {
     /// Set the verbosity level
     verbose: bool,
 
+    #[structopt(long = "no-default-features")]
+    /// Pass the no default features flag to clippy
+    no_default_features: bool,
     #[structopt(
         short = "b",
         long = "branch",
@@ -46,6 +49,7 @@ fn main() -> Result<(), error::Error> {
     println!("Running clippy");
     let clippy_lints = clippy::Linter::new()
         .set_verbose(opts.verbose)
+        .set_no_default_features(opts.no_default_features)
         .get_lints()?;
 
     let warnings_caused_by_diff =
