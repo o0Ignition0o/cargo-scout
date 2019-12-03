@@ -5,7 +5,7 @@ pub enum Error {
     Utf8(std::string::FromUtf8Error),
     Json(serde_json::Error),
     NotClean,
-    IoError(std::io::Error),
+    Io(std::io::Error),
 }
 
 impl From<std::string::FromUtf8Error> for Error {
@@ -28,7 +28,7 @@ impl From<String> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
-        Self::IoError(err)
+        Self::Io(err)
     }
 }
 
