@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::io::{self, Write};
 use std::process::Command;
 
 #[derive(Deserialize, PartialEq, Debug)]
@@ -120,7 +121,7 @@ impl Linter {
             if build.status.success() {
                 Err(String::from_utf8(build.stdout)?.into())
             } else {
-                println!("{}", String::from_utf8(build.stdout.clone())?);
+                io::stdout().write_all(&build.stdout)?;
                 Err(String::from_utf8(build.stderr)?.into())
             }
         } else {
