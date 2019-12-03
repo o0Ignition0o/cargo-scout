@@ -10,5 +10,5 @@ env:
 before_script:
   - rustup component add clippy
 script:
-  - cargo clippy -- -D pedantic
+  - cargo clippy -- -D clippy::pedantic
   - cargo test --all

@@ -1,5 +1,6 @@
 use structopt::StructOpt;
 
+mod cargo;
 mod clippy;
 mod error;
 mod git;
@@ -46,6 +47,11 @@ fn main() -> Result<(), error::Error> {
     let diff_sections = git::Parser::new()
         .set_verbose(opts.verbose)
         .get_sections(&opts.branch)?;
+    println!("Checking Cargo manifest");
+    let manifest = cargo::Parser::from_manifest_path("./Cargo.toml")?;
+    if manifest.is_workspace() {
+        println!("Running in workspace, please note feature flags are not supported yet.");
+    }
     println!("Running clippy");
     let clippy_lints = clippy::Linter::new()
         .set_verbose(opts.verbose)
