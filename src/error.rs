@@ -1,5 +1,6 @@
 #[derive(Debug)]
 pub enum Error {
+    CargoToml(cargo_toml::Error),
     Command(String),
     Utf8(std::string::FromUtf8Error),
     Json(serde_json::Error),
@@ -28,5 +29,11 @@ impl From<String> for Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Self::IoError(err)
+    }
+}
+
+impl From<cargo_toml::Error> for Error {
+    fn from(err: cargo_toml::Error) -> Self {
+        Self::CargoToml(err)
     }
 }
