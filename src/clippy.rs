@@ -47,6 +47,7 @@ pub struct Span {
 pub struct Linter {
     verbose: bool,
     no_default_features: bool,
+    all_features: bool,
 }
 
 impl Linter {
@@ -54,6 +55,7 @@ impl Linter {
         Self {
             verbose: false,
             no_default_features: false,
+            all_features: false,
         }
     }
 
@@ -64,6 +66,11 @@ impl Linter {
 
     pub fn set_no_default_features(&mut self, no_default_features: bool) -> &mut Self {
         self.no_default_features = no_default_features;
+        self
+    }
+
+    pub fn set_all_features(&mut self, all_features: bool) -> &mut Self {
+        self.all_features = all_features;
         self
     }
 
@@ -78,6 +85,9 @@ impl Linter {
         }
         if self.no_default_features {
             params.push("--no-default-features");
+        }
+        if self.all_features {
+            params.push("--all-features");
         }
         params.append(&mut vec!["--", "-W", "clippy::pedantic"]);
         params
@@ -216,6 +226,24 @@ mod tests {
         assert_eq!(
             no_default_features_command_parameters,
             no_default_features_linter.get_command_parameters()
+        );
+
+        let all_features_linter = linter
+            .set_verbose(false)
+            .set_no_default_features(false)
+            .set_all_features(true);
+        let all_features_command_parameters = vec![
+            "clippy",
+            "--message-format",
+            "json",
+            "--all-features",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            all_features_command_parameters,
+            all_features_linter.get_command_parameters()
         );
     }
     #[test]
