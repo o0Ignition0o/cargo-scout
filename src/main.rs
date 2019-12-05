@@ -28,6 +28,10 @@ struct Options {
     )]
     /// Set the target branch
     branch: String,
+
+    #[structopt(short = "t", long = "cargo-toml")]
+    /// Pass the path of the `Cargo.toml` file
+    cargo_toml: Option<String>,
 }
 
 fn display_warnings(warnings: &[clippy::Lint]) {
@@ -48,7 +52,10 @@ fn main() -> Result<(), error::Error> {
         .set_verbose(opts.verbose)
         .get_sections(&opts.branch)?;
     println!("Checking Cargo manifest");
-    let manifest = cargo::Parser::from_manifest_path("./Cargo.toml")?;
+    let path = opts
+        .cargo_toml
+        .unwrap_or_else(|| String::from("./Cargo.toml"));
+    let manifest = cargo::Parser::from_manifest_path(path)?;
     if manifest.is_workspace() {
         println!("Running in workspace, please note feature flags are not supported yet.");
     }
