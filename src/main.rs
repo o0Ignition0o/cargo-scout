@@ -34,6 +34,9 @@ struct Options {
     #[structopt(short = "t", long = "cargo-toml", default_value = "./Cargo.toml")]
     /// Pass the path of the `Cargo.toml` file
     cargo_toml: String,
+    #[structopt(short = "w", long = "without-error")]
+    /// Set to display the warnings without actually returning an error
+    without_error: bool,
 }
 
 fn display_warnings(warnings: &[clippy::Lint]) {
@@ -44,6 +47,7 @@ fn display_warnings(warnings: &[clippy::Lint]) {
             }
         }
     }
+    println!("Clippy::pedantic found {} warnings", warnings.len());
 }
 
 fn main() -> Result<(), error::Error> {
@@ -67,15 +71,44 @@ fn main() -> Result<(), error::Error> {
 
     let warnings_caused_by_diff =
         intersections::get_lints_from_diff(&clippy_lints, &diff_sections, opts.verbose);
-    if warnings_caused_by_diff.is_empty() {
+
+    return_warnings(&warnings_caused_by_diff, opts.without_error)
+}
+
+fn return_warnings(lints: &[clippy::Lint], without_error: bool) -> Result<(), error::Error> {
+    if lints.is_empty() {
         println!("No warnings raised by clippy::pedantic in your diff, you're good to go!");
         Ok(())
     } else {
-        display_warnings(&warnings_caused_by_diff);
-        println!(
-            "Clippy::pedantic found {} warnings",
-            warnings_caused_by_diff.len()
-        );
+        display_warnings(&lints);
+        if without_error {
+            return Ok(());
+        }
         Err(error::Error::NotClean)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::clippy::Lint;
+    use crate::return_warnings;
+    #[test]
+    fn test_return_status_with_lints() {
+        let lints = vec![Lint {
+            package_id: "cargo-scout".to_string(),
+            src_path: None,
+            message: None,
+        }];
+
+        assert!(return_warnings(&lints, true).is_ok());
+        assert!(return_warnings(&lints, false).is_err());
+    }
+
+    #[test]
+    fn test_return_status_without_existing_lints() {
+        let lints: Vec<Lint> = Vec::new();
+
+        assert!(return_warnings(&lints, true).is_ok());
+        assert!(return_warnings(&lints, false).is_ok());
     }
 }
