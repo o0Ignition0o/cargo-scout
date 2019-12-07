@@ -34,7 +34,7 @@ struct Options {
     #[structopt(short = "t", long = "cargo-toml", default_value = "./Cargo.toml")]
     /// Pass the path of the `Cargo.toml` file
     cargo_toml: String,
-    #[structopt(short = "W", long = "without-error")]
+    #[structopt(short = "w", long = "without-error")]
     /// Set to display the warnings without actually returning an error
     without_error: bool,
 }
@@ -47,6 +47,7 @@ fn display_warnings(warnings: &[clippy::Lint]) {
             }
         }
     }
+    println!("Clippy::pedantic found {} warnings", warnings.len());
 }
 
 fn main() -> Result<(), error::Error> {
@@ -79,12 +80,10 @@ fn return_warnings(lints: &[clippy::Lint], without_error: bool) -> Result<(), er
         println!("No warnings raised by clippy::pedantic in your diff, you're good to go!");
         Ok(())
     } else {
+        display_warnings(&lints);
         if without_error {
-            display_warnings(&lints);
             return Ok(());
         }
-        display_warnings(&lints);
-        println!("Clippy::pedantic found {} warnings", lints.len());
         Err(error::Error::NotClean)
     }
 }
