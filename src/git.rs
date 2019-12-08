@@ -117,11 +117,7 @@ impl Parser {
             // When consecutive added (+) lines stops, create the section and push it
             } else if !l.starts_with("-") {
                 if line_start != 0 {
-                    let mut current_section = SectionBuilder::new();
-                    current_section.file_name(file_name.to_string());
-                    current_section.line_start(line_start);
-                    current_section.line_end(line_end);
-                    if let Some(s) = current_section.build() {
+                    if let Some(s) = create_section(&file_name, line_start, line_end) {
                         sections.push(s);
                     }
                 }
@@ -130,8 +126,21 @@ impl Parser {
                 line_end = 0;
             }
         }
+        if line_start != 0 {
+            if let Some(s) = create_section(&file_name, line_start, line_end) {
+                sections.push(s);
+            }
+        }
         sections
     }
+}
+
+fn create_section(file_name: &str, line_start: i32, line_end: i32) -> Option<Section> {
+    let mut current_section = SectionBuilder::new();
+    current_section.file_name(file_name.to_string());
+    current_section.line_start(line_start);
+    current_section.line_end(line_end);
+    current_section.build()
 }
 
 fn get_diff_line_start(line: &str) -> i32 {
@@ -187,13 +196,13 @@ mod tests {
         let expected_sections: Vec<Section> = vec![
             Section {
                 file_name: "src/git.rs".to_string(),
-                line_start: 4,
-                line_end: 11,
+                line_start: 7,
+                line_end: 7,
             },
             Section {
                 file_name: "src/git.rs".to_string(),
-                line_start: 117,
-                line_end: 147,
+                line_start: 120,
+                line_end: 146,
             },
         ];
         let parser = Parser::new();
@@ -210,18 +219,18 @@ mod tests {
         let expected_sections: Vec<Section> = vec![
             Section {
                 file_name: "src/clippy.rs".to_string(),
-                line_start: 124,
-                line_end: 129,
+                line_start: 127,
+                line_end: 128,
             },
             Section {
                 file_name: "src/git.rs".to_string(),
-                line_start: 4,
-                line_end: 11,
+                line_start: 7,
+                line_end: 7,
             },
             Section {
                 file_name: "src/git.rs".to_string(),
-                line_start: 117,
-                line_end: 181,
+                line_start: 120,
+                line_end: 180,
             },
         ];
         let parser = Parser::new();
