@@ -1,10 +1,11 @@
 use crate::clippy;
 use crate::git;
 
+// Check if clippy_lint and git_section have overlapped lines
 fn lines_in_range(clippy_lint: &clippy::Span, git_section: &git::Section) -> bool {
-    // <clippy_lint------<git_section----clippy_lint>------git_section>
+    // If git_section.line_start is included in the clippy_lint span
     clippy_lint.line_start <= git_section.line_start && git_section.line_start <= clippy_lint.line_end ||
-    // <git_section------<clippy_lint----git_section>------clippy_lint>
+    // If clippy_lint.line_start is included in the git_section span
     git_section.line_start <= clippy_lint.line_start && clippy_lint.line_start <= git_section.line_end
 }
 

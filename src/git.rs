@@ -83,44 +83,82 @@ impl Parser {
     fn sections(&self, git_diff: &str) -> Vec<Section> {
         let mut sections = Vec::new();
         let mut file_name = "";
+        let mut line_start = 0;
+        let mut line_end = 0;
+        let mut current_line = 0;
+
         for l in git_diff.lines() {
-            // Add or edit a file
+            // File added or edited
             // +++ b/Cargo.lock
             if l.starts_with("+++") {
                 // TODO: do something less ugly with the bounds and indexing
                 file_name = l[l.find('/').unwrap() + 1..].into();
             }
-            // Actual diff lines
-            // @@ -33,6 +33,9 @@ version = "0.1.0"
-            if l.starts_with("@@") {
-                // For now, we will focus on the added lines.
-                // @@ and space
-                let after_ats = &l[3..];
-                // space and @@
-                let before_second_ats_index = &after_ats.find("@@").unwrap() - 1;
-                let diff_lines = &after_ats[..before_second_ats_index];
-                // -33,6 +33,9
-                let (_, a) = diff_lines.split_at(diff_lines.find(' ').unwrap());
-                let added = a.trim();
 
-                let (added_start, added_span) = if let Some(index) = added[1..].find(',') {
-                    let (a, b) = added[1..].split_at(index);
-                    (a, &b[1..])
+            // Actual diff lines
+            // '@@ -33,6 +33,9 @@ version = "0.1.0"'
+            if l.starts_with("@@") {
+                current_line = get_diff_line_start(&l) - 1;
+            }
+
+            // Increase the current line counter if added or untouched line in diff
+            if l.starts_with(' ') || (l.starts_with('+') && !l.starts_with("+++")) {
+                current_line += 1;
+            }
+
+            // Set the sections start & end if added line (+)
+            if l.starts_with('+') && !l.starts_with("+++") {
+                if line_start == 0 {
+                    line_start = current_line;
+                    line_end = line_start;
                 } else {
-                    (added, "")
-                };
-                let min_line_start = added_start.parse::<i32>().unwrap();
-                let mut current_section = SectionBuilder::new();
-                current_section.file_name(file_name.to_string());
-                current_section.line_start(min_line_start);
-                current_section.line_end(min_line_start + added_span.parse::<i32>().unwrap_or(1));
-                if let Some(s) = current_section.build() {
-                    sections.push(s);
+                    line_end += 1;
                 }
+            // When consecutive added (+) lines stops, create the section and push it
+            } else if !l.starts_with('-') {
+                if line_start != 0 {
+                    if let Some(s) = create_section(&file_name, line_start, line_end) {
+                        sections.push(s);
+                    }
+                }
+                // Resets start and end for next section
+                line_start = 0;
+                line_end = 0;
+            }
+        }
+        if line_start != 0 {
+            if let Some(s) = create_section(&file_name, line_start, line_end) {
+                sections.push(s);
             }
         }
         sections
     }
+}
+
+fn create_section(file_name: &str, line_start: i32, line_end: i32) -> Option<Section> {
+    let mut current_section = SectionBuilder::new();
+    current_section.file_name(file_name.to_string());
+    current_section.line_start(line_start);
+    current_section.line_end(line_end);
+    current_section.build()
+}
+
+fn get_diff_line_start(line: &str) -> i32 {
+    // @@ and space
+    let after_ats = &line[3..];
+    // space and @@
+    let before_second_ats_index = &after_ats.find("@@").unwrap() - 1;
+    // -33,6 +33,9
+    let diff_lines = &after_ats[..before_second_ats_index];
+    let (_, to) = diff_lines.split_at(diff_lines.find(' ').unwrap());
+    let added = to.trim();
+    let (added_start, _) = if let Some(index) = added[1..].find(',') {
+        let (a, b) = added[1..].split_at(index);
+        (a, &b[1..])
+    } else {
+        (added, "")
+    };
+    added_start.parse::<i32>().unwrap()
 }
 
 #[cfg(test)]
@@ -158,13 +196,13 @@ mod tests {
         let expected_sections: Vec<Section> = vec![
             Section {
                 file_name: "src/git.rs".to_string(),
-                line_start: 4,
-                line_end: 11,
+                line_start: 7,
+                line_end: 7,
             },
             Section {
                 file_name: "src/git.rs".to_string(),
-                line_start: 117,
-                line_end: 147,
+                line_start: 120,
+                line_end: 146,
             },
         ];
         let parser = Parser::new();
@@ -181,18 +219,18 @@ mod tests {
         let expected_sections: Vec<Section> = vec![
             Section {
                 file_name: "src/clippy.rs".to_string(),
-                line_start: 124,
-                line_end: 129,
+                line_start: 127,
+                line_end: 128,
             },
             Section {
                 file_name: "src/git.rs".to_string(),
-                line_start: 4,
-                line_end: 11,
+                line_start: 7,
+                line_end: 7,
             },
             Section {
                 file_name: "src/git.rs".to_string(),
-                line_start: 117,
-                line_end: 181,
+                line_start: 120,
+                line_end: 180,
             },
         ];
         let parser = Parser::new();
