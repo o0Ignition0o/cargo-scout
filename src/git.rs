@@ -102,12 +102,12 @@ impl Parser {
             }
 
             // Increase the current line counter if added or untouched line in diff
-            if l.starts_with(' ') || (l.starts_with("+") && !l.starts_with("+++")) {
+            if l.starts_with(' ') || (l.starts_with('+') && !l.starts_with("+++")) {
                 current_line += 1;
             }
 
             // Set the sections start & end if added line (+)
-            if l.starts_with("+") && !l.starts_with("+++") {
+            if l.starts_with('+') && !l.starts_with("+++") {
                 if line_start == 0 {
                     line_start = current_line;
                     line_end = line_start;
@@ -115,7 +115,7 @@ impl Parser {
                     line_end += 1;
                 }
             // When consecutive added (+) lines stops, create the section and push it
-            } else if !l.starts_with("-") {
+            } else if !l.starts_with('-') {
                 if line_start != 0 {
                     if let Some(s) = create_section(&file_name, line_start, line_end) {
                         sections.push(s);
@@ -150,8 +150,8 @@ fn get_diff_line_start(line: &str) -> i32 {
     let before_second_ats_index = &after_ats.find("@@").unwrap() - 1;
     // -33,6 +33,9
     let diff_lines = &after_ats[..before_second_ats_index];
-    let (_, a) = diff_lines.split_at(diff_lines.find(' ').unwrap());
-    let added = a.trim();
+    let (_, to) = diff_lines.split_at(diff_lines.find(' ').unwrap());
+    let added = to.trim();
     let (added_start, _) = if let Some(index) = added[1..].find(',') {
         let (a, b) = added[1..].split_at(index);
         (a, &b[1..])
