@@ -91,12 +91,10 @@ impl Parser {
             // File added or edited
             // +++ b/Cargo.lock
             if l.starts_with("+++") {
-                // Only add .rs file to the diff
+                // Only add name of .rs file
                 if l.ends_with(".rs") {
                     // TODO: do something less ugly with the bounds and indexing
                     file_name = l[l.find('/').unwrap() + 1..].into();
-                } else {
-                    continue;
                 }
             }
 
@@ -121,7 +119,7 @@ impl Parser {
                 }
             // When consecutive added (+) lines stops, create the section and push it
             } else if !l.starts_with('-') {
-                if line_start != 0 {
+                if line_start != 0 && file_name != "" {
                     if let Some(s) = create_section(&file_name, line_start, line_end) {
                         sections.push(s);
                     }
@@ -131,7 +129,7 @@ impl Parser {
                 line_end = 0;
             }
         }
-        if line_start != 0 {
+        if line_start != 0 && file_name != "" {
             if let Some(s) = create_section(&file_name, line_start, line_end) {
                 sections.push(s);
             }
@@ -236,6 +234,24 @@ mod tests {
                 file_name: "src/git.rs".to_string(),
                 line_start: 120,
                 line_end: 180,
+            },
+        ];
+        let parser = Parser::new();
+        // Run
+        let actual_sections = parser.sections(&diff);
+        // Assert
+        assert_eq!(expected_sections, actual_sections);
+    }
+    #[test]
+    fn test_diff_several_files_extension() {
+        use crate::git::{Parser, Section};
+        // Setup
+        let diff = std::fs::read_to_string("test_files/git/diff_several_files_extension.patch").unwrap();
+        let expected_sections: Vec<Section> = vec![
+            Section {
+                file_name: "src/git.rs".to_string(),
+                line_start: 91,
+                line_end: 97,
             },
         ];
         let parser = Parser::new();
