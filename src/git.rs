@@ -91,8 +91,13 @@ impl Parser {
             // File added or edited
             // +++ b/Cargo.lock
             if l.starts_with("+++") {
-                // TODO: do something less ugly with the bounds and indexing
-                file_name = l[l.find('/').unwrap() + 1..].into();
+                // Only add .rs file to the diff
+                if l.ends_with(".rs") {
+                    // TODO: do something less ugly with the bounds and indexing
+                    file_name = l[l.find('/').unwrap() + 1..].into();
+                } else {
+                    continue;
+                }
             }
 
             // Actual diff lines
