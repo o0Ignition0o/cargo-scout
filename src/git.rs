@@ -243,10 +243,10 @@ mod tests {
         assert_eq!(expected_sections, actual_sections);
     }
     #[test]
-    fn test_diff_several_files_extension() {
+    fn test_diff_several_extensions_files() {
         use crate::git::{Parser, Section};
         // Setup
-        let diff = std::fs::read_to_string("test_files/git/diff_several_files_extension.patch").unwrap();
+        let diff = std::fs::read_to_string("test_files/git/diff_several_extensions_files.patch").unwrap();
         let expected_sections: Vec<Section> = vec![
             Section {
                 file_name: "src/git.rs".to_string(),
