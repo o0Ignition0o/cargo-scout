@@ -13,6 +13,10 @@ impl Parser {
         !self.members.is_empty()
     }
 
+    pub fn get_members(&self) -> Vec<String> {
+        self.members.clone()
+    }
+
     fn new() -> Self {
         Self { members: vec![] }
     }

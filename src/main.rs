@@ -63,11 +63,17 @@ fn main() -> Result<(), error::Error> {
         println!("Running in workspace, please note feature flags are not supported yet.");
     }
     println!("Running clippy");
-    let clippy_lints = clippy::Linter::new()
+    let mut clippy_linter = clippy::Linter::new();
+    clippy_linter
         .set_verbose(opts.verbose)
         .set_no_default_features(opts.no_default_features)
-        .set_all_features(opts.all_features)
-        .get_lints()?;
+        .set_all_features(opts.all_features);
+
+    let clippy_lints = if manifest.is_workspace() || clippy_linter.can_run_in_workspace() {
+        clippy_linter.get_lints()?
+    } else {
+        clippy_linter.get_lints_for_members(manifest.get_members())?
+    };
 
     let warnings_caused_by_diff =
         intersections::get_lints_from_diff(&clippy_lints, &diff_sections, opts.verbose);

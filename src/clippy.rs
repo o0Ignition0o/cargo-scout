@@ -75,7 +75,34 @@ impl Linter {
     }
 
     pub fn get_lints(&self) -> Result<Vec<Lint>, crate::error::Error> {
-        self.clippy().map(|output| lints(&output))
+        self.get_lints_for_project(std::fs::canonicalize(".")?)
+    }
+
+    pub fn can_run_in_workspace(&self) -> bool {
+        !self.no_default_features
+    }
+
+    pub fn get_lints_for_members(
+        &self,
+        members: Vec<String>,
+    ) -> Result<Vec<Lint>, crate::error::Error> {
+        let current_dir = std::fs::canonicalize(".")?;
+        let mut lints = Vec::new();
+        for m in members {
+            println!(
+                "Running clippy on workspace member {:?}",
+                current_dir.join(&m)
+            );
+            lints.extend(self.get_lints_for_project(current_dir.join(m))?);
+        }
+        Ok(lints)
+    }
+
+    fn get_lints_for_project(
+        &self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Vec<Lint>, crate::error::Error> {
+        self.clippy(path).map(|output| lints(&output))
     }
 
     fn get_command_parameters(&self) -> Vec<&str> {
@@ -101,8 +128,9 @@ impl Linter {
         envs
     }
 
-    fn clippy(&self) -> Result<String, crate::error::Error> {
+    fn clippy(&self, path: impl AsRef<std::path::Path>) -> Result<String, crate::error::Error> {
         let clippy_pedantic_output = Command::new("cargo")
+            .current_dir(path)
             .args(self.get_command_parameters())
             .envs(self.get_envs())
             .output()
