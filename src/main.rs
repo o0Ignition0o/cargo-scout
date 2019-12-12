@@ -1,3 +1,4 @@
+use std::env;
 use structopt::StructOpt;
 
 mod cargo;
@@ -54,9 +55,7 @@ fn main() -> Result<(), error::Error> {
     let opts = Options::from_args();
 
     println!("Getting diff against target {}", opts.branch);
-    let diff_sections = git::Parser::new()
-        .set_verbose(opts.verbose)
-        .get_sections(&opts.branch)?;
+    let diff_sections = git::get_sections(env::current_dir()?, &opts.branch)?;
     println!("Checking Cargo manifest");
     let manifest = cargo::Parser::from_manifest_path(opts.cargo_toml)?;
     if manifest.is_workspace() {

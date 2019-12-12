@@ -40,8 +40,8 @@ pub struct Message {
 #[derive(Deserialize, PartialEq, Debug, Clone)]
 pub struct Span {
     pub file_name: String,
-    pub line_start: i32,
-    pub line_end: i32,
+    pub line_start: u32,
+    pub line_end: u32,
 }
 
 pub struct Linter {

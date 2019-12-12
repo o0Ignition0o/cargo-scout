@@ -46,7 +46,7 @@ mod intersections_tests {
     use crate::git::Section;
     use crate::intersections::files_match;
 
-    type TestSection = (&'static str, i32, i32);
+    type TestSection = (&'static str, u32, u32);
     #[test]
 
     fn test_files_match() {
@@ -167,7 +167,7 @@ mod intersections_tests {
         }
     }
 
-    fn in_range(lint: (&str, i32, i32), section: (&str, i32, i32)) -> bool {
+    fn in_range(lint: (&str, u32, u32), section: (&str, u32, u32)) -> bool {
         use crate::intersections::lines_in_range;
         let clippy_lint = Span {
             file_name: String::from(lint.0),

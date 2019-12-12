@@ -6,6 +6,7 @@ pub enum Error {
     Json(serde_json::Error),
     NotClean,
     Io(std::io::Error),
+    Git(git2::Error),
 }
 
 impl From<std::string::FromUtf8Error> for Error {
@@ -35,5 +36,11 @@ impl From<std::io::Error> for Error {
 impl From<cargo_toml::Error> for Error {
     fn from(err: cargo_toml::Error) -> Self {
         Self::CargoToml(err)
+    }
+}
+
+impl From<git2::Error> for Error {
+    fn from(err: git2::Error) -> Self {
+        Self::Git(err)
     }
 }
