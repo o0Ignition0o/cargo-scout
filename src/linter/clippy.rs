@@ -1,56 +1,22 @@
-use serde::Deserialize;
+use crate::linter::{Lint, Linter};
 use std::io::{self, Write};
+use std::path::PathBuf;
 use std::process::Command;
 
-#[derive(Deserialize, PartialEq, Debug)]
-pub struct LintCode {
-    pub code: String,
-    pub explanation: String,
-}
-
-#[derive(Deserialize, PartialEq, Debug)]
-pub struct LintSpan {
-    pub file_name: String,
-    /// The line where the lint should be reported
-    ///
-    /// GitHub provides a line_start and a line_end.
-    /// We should use the line_start in case of multi-line lints.
-    /// (Why?)
-    pub line_start: usize,
-}
-
-#[derive(Deserialize, PartialEq, Debug, Clone)]
-pub struct Lint {
-    /// The lint message
-    ///
-    /// Example:
-    ///
-    /// unused variable: `count`
-    pub package_id: String,
-    pub src_path: Option<String>,
-    pub message: Option<Message>,
-}
-
-#[derive(Deserialize, PartialEq, Debug, Clone)]
-pub struct Message {
-    pub rendered: String,
-    pub spans: Vec<Span>,
-}
-
-#[derive(Deserialize, PartialEq, Debug, Clone)]
-pub struct Span {
-    pub file_name: String,
-    pub line_start: u32,
-    pub line_end: u32,
-}
-
-pub struct Linter {
+pub struct Clippy {
     verbose: bool,
     no_default_features: bool,
     all_features: bool,
 }
 
-impl Linter {
+impl Linter for Clippy {
+    fn get_lints(&self, working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
+        self.clippy(working_dir)
+            .map(|clippy_output| lints(clippy_output.as_ref()))
+    }
+}
+
+impl Clippy {
     pub fn new() -> Self {
         Self {
             verbose: false,
@@ -72,10 +38,6 @@ impl Linter {
     pub fn set_all_features(&mut self, all_features: bool) -> &mut Self {
         self.all_features = all_features;
         self
-    }
-
-    pub fn get_lints(&self) -> Result<Vec<Lint>, crate::error::Error> {
-        self.clippy().map(|output| lints(&output))
     }
 
     fn get_command_parameters(&self) -> Vec<&str> {
@@ -101,8 +63,9 @@ impl Linter {
         envs
     }
 
-    fn clippy(&self) -> Result<String, crate::error::Error> {
+    fn clippy(&self, path: impl AsRef<std::path::Path>) -> Result<String, crate::error::Error> {
         let clippy_pedantic_output = Command::new("cargo")
+            .current_dir(path)
             .args(self.get_command_parameters())
             .envs(self.get_envs())
             .output()
@@ -157,11 +120,10 @@ pub fn lints(clippy_output: &str) -> Vec<Lint> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     #[test]
     fn test_set_verbose() {
-        use crate::clippy::Linter;
-
-        let mut linter = Linter::new();
+        let mut linter = Clippy::new();
         assert_eq!(false, linter.verbose);
 
         let l2 = linter.set_verbose(true);
@@ -172,9 +134,7 @@ mod tests {
     }
     #[test]
     fn test_get_envs() {
-        use crate::clippy::Linter;
-
-        let mut linter = Linter::new();
+        let mut linter = Clippy::new();
         let mut expected_envs = vec![];
         assert_eq!(expected_envs, linter.get_envs());
 
@@ -184,9 +144,7 @@ mod tests {
     }
     #[test]
     fn test_get_command_parameters() {
-        use crate::clippy::Linter;
-
-        let mut linter = Linter::new();
+        let mut linter = Clippy::new();
         let expected_command_parameters = vec![
             "clippy",
             "--message-format",
@@ -248,7 +206,7 @@ mod tests {
     }
     #[test]
     fn test_lints() {
-        use crate::clippy::{lints, Lint, Message, Span};
+        use crate::linter::{Message, Span};
         let expected_lints = vec![Lint {
             package_id: "cargo-scout".to_string(),
             src_path: Some("test/foo/bar.rs".to_string()),
