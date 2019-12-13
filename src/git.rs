@@ -1,263 +1,250 @@
-use std::process::Command;
-
-pub struct Parser {
-    verbose: bool,
-}
+use crate::error::Error;
+use git2::{Delta, DiffOptions, Repository};
+use std::path::Path;
 
 #[derive(Debug, PartialEq)]
 pub struct Section {
     pub file_name: String,
-    pub line_start: i32,
-    pub line_end: i32,
+    pub line_start: u32,
+    pub line_end: u32,
 }
 
-#[derive(Debug)]
-pub struct SectionBuilder {
-    file_name: Option<String>,
-    line_start: Option<i32>,
-    line_end: Option<i32>,
-}
+pub fn get_sections<P>(repo_path: P, branch: &str) -> Result<Vec<Section>, Error>
+where
+    P: AsRef<Path>,
+{
+    let repo = Repository::discover(repo_path)?;
+    let tree = repo.revparse_single(branch)?.peel_to_tree()?;
+    let mut config = DiffOptions::default();
+    config.context_lines(0);
 
-impl SectionBuilder {
-    pub fn new() -> Self {
-        Self {
-            file_name: None,
-            line_start: None,
-            line_end: None,
-        }
-    }
+    let diff = repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut config))?;
+    let mut sections = Vec::new();
 
-    pub fn file_name(&mut self, file_name: String) {
-        self.file_name = Some(file_name);
-    }
+    diff.foreach(
+        &mut |_delta, _progress| true,
+        None,
+        Some(&mut |delta, hunk| {
+            match delta.status() {
+                Delta::Modified | Delta::Added => {
+                    if let Some(file_path) = delta.new_file().path() {
+                        let file_path = file_path.to_string_lossy().to_string();
 
-    pub fn line_start(&mut self, line_start: i32) {
-        self.line_start = Some(line_start);
-    }
-
-    pub fn line_end(&mut self, line_end: i32) {
-        self.line_end = Some(line_end);
-    }
-
-    pub fn build(self) -> Option<Section> {
-        match (self.file_name, self.line_start, self.line_end) {
-            (Some(file_name), Some(line_start), Some(line_end)) => Some(Section {
-                file_name,
-                line_start,
-                line_end,
-            }),
-            _ => None,
-        }
-    }
-}
-
-impl Parser {
-    pub fn new() -> Self {
-        Self { verbose: false }
-    }
-
-    pub fn set_verbose(&mut self, verbose: bool) -> &mut Self {
-        self.verbose = verbose;
-        self
-    }
-
-    pub fn get_sections(&self, target_branch: &str) -> Result<Vec<Section>, crate::error::Error> {
-        self.diff(target_branch).map(|diff| self.sections(&diff))
-    }
-
-    fn diff(&self, target: &str) -> Result<String, crate::error::Error> {
-        let cmd_output = Command::new("git")
-            .args(&["diff", "-u", target])
-            .output()
-            .expect("Could not run git command.");
-        if self.verbose {
-            println!("{}", String::from_utf8(cmd_output.stdout.clone())?);
-        }
-        if cmd_output.status.success() {
-            Ok(String::from_utf8(cmd_output.stdout)?)
-        } else {
-            Err(String::from_utf8(cmd_output.stderr)?.into())
-        }
-    }
-
-    fn sections(&self, git_diff: &str) -> Vec<Section> {
-        let mut sections = Vec::new();
-        let mut file_name = "";
-        let mut line_start = 0;
-        let mut line_end = 0;
-        let mut current_line = 0;
-
-        for l in git_diff.lines() {
-            // File added or edited
-            // +++ b/Cargo.lock
-            if l.starts_with("+++") {
-                // Only add name of .rs file
-                if l.ends_with(".rs") {
-                    // TODO: do something less ugly with the bounds and indexing
-                    file_name = l[l.find('/').unwrap() + 1..].into();
-                }
-            }
-
-            // Actual diff lines
-            // '@@ -33,6 +33,9 @@ version = "0.1.0"'
-            if l.starts_with("@@") {
-                current_line = get_diff_line_start(&l) - 1;
-            }
-
-            // Increase the current line counter if added or untouched line in diff
-            if l.starts_with(' ') || (l.starts_with('+') && !l.starts_with("+++")) {
-                current_line += 1;
-            }
-
-            // Set the sections start & end if added line (+)
-            if l.starts_with('+') && !l.starts_with("+++") {
-                if line_start == 0 {
-                    line_start = current_line;
-                    line_end = line_start;
-                } else {
-                    line_end += 1;
-                }
-            // When consecutive added (+) lines stops, create the section and push it
-            } else if !l.starts_with('-') {
-                if line_start != 0 && file_name != "" {
-                    if let Some(s) = create_section(&file_name, line_start, line_end) {
-                        sections.push(s);
+                        if file_path.ends_with(".rs") {
+                            sections.push(Section {
+                                file_name: file_path,
+                                line_start: hunk.new_start(),
+                                line_end: hunk.new_start() + hunk.new_lines(),
+                            });
+                        }
                     }
                 }
-                // Resets start and end for next section
-                line_start = 0;
-                line_end = 0;
+                _ => {}
             }
-        }
-        if line_start != 0 && file_name != "" {
-            if let Some(s) = create_section(&file_name, line_start, line_end) {
-                sections.push(s);
-            }
-        }
-        sections
-    }
-}
+            true
+        }),
+        None,
+    )?;
 
-fn create_section(file_name: &str, line_start: i32, line_end: i32) -> Option<Section> {
-    let mut current_section = SectionBuilder::new();
-    current_section.file_name(file_name.to_string());
-    current_section.line_start(line_start);
-    current_section.line_end(line_end);
-    current_section.build()
-}
-
-fn get_diff_line_start(line: &str) -> i32 {
-    // @@ and space
-    let after_ats = &line[3..];
-    // space and @@
-    let before_second_ats_index = &after_ats.find("@@").unwrap() - 1;
-    // -33,6 +33,9
-    let diff_lines = &after_ats[..before_second_ats_index];
-    let (_, to) = diff_lines.split_at(diff_lines.find(' ').unwrap());
-    let added = to.trim();
-    let (added_start, _) = if let Some(index) = added[1..].find(',') {
-        let (a, b) = added[1..].split_at(index);
-        (a, &b[1..])
-    } else {
-        (added, "")
-    };
-    added_start.parse::<i32>().unwrap()
+    Ok(sections)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use std::fs::{self, File};
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    type Result<T> = std::result::Result<T, Error>;
+
     #[test]
-    fn test_set_verbose() {
-        use crate::git::Parser;
+    fn no_changes() -> Result<()> {
+        let repo = RepoFixture::new()?;
 
-        let mut parser = Parser::new();
-        assert_eq!(false, parser.verbose);
-
-        let p2 = parser.set_verbose(true);
-        assert_eq!(true, p2.verbose);
-
-        let p3 = p2.set_verbose(false);
-        assert_eq!(false, p3.verbose);
+        let sections = get_sections(repo.path(), "master").unwrap();
+        assert!(sections.is_empty());
+        Ok(())
     }
+
     #[test]
-    fn test_empty_diff() {
-        use crate::git::{Parser, Section};
-        // Setup
-        let diff = r#""#;
-        let expected_sections: Vec<Section> = vec![];
-        let parser = Parser::new();
-        // Run
-        let actual_sections = parser.sections(diff);
-        // Assert
-        assert_eq!(expected_sections, actual_sections);
-    }
-    #[test]
-    fn test_simple_diff() {
-        use crate::git::{Parser, Section};
-        // Setup
-        let diff = std::fs::read_to_string("test_files/git/one_diff.patch").unwrap();
-        let expected_sections: Vec<Section> = vec![
+    fn added_files() -> Result<()> {
+        let repo = RepoFixture::new()?
+            .write("foo.rs", "test_files/git/added/foo.rs")?
+            .write("bar.rs", "test_files/git/added/bar.rs")?
+            .stage(&["foo.rs", "bar.rs"])?;
+
+        let expected = vec![
             Section {
-                file_name: "src/git.rs".to_string(),
-                line_start: 7,
+                file_name: "bar.rs".into(),
+                line_start: 1,
+                line_end: 5,
+            },
+            Section {
+                file_name: "foo.rs".into(),
+                line_start: 1,
                 line_end: 7,
             },
-            Section {
-                file_name: "src/git.rs".to_string(),
-                line_start: 120,
-                line_end: 146,
-            },
         ];
-        let parser = Parser::new();
-        // Run
-        let actual_sections = parser.sections(&diff);
-        // Assert
-        assert_eq!(expected_sections, actual_sections);
+        let actual = get_sections(repo.path(), "master").unwrap();
+        assert_eq!(expected, actual);
+        Ok(())
     }
+
     #[test]
-    fn test_diff_several_files() {
-        use crate::git::{Parser, Section};
-        // Setup
-        let diff = std::fs::read_to_string("test_files/git/diff_several_files.patch").unwrap();
-        let expected_sections: Vec<Section> = vec![
+    fn modified_files() -> Result<()> {
+        let files = &["foo.rs", "bar.rs"];
+        let repo = RepoFixture::new()?
+            .write("foo.rs", "test_files/git/modified/old/foo.rs")?
+            .write("bar.rs", "test_files/git/modified/old/bar.rs")?
+            .stage(files)?
+            .commit("master", files)?
+            .write("foo.rs", "test_files/git/modified/new/foo.rs")?
+            .write("bar.rs", "test_files/git/modified/new/bar.rs")?;
+
+        let expected = vec![
             Section {
-                file_name: "src/clippy.rs".to_string(),
-                line_start: 127,
-                line_end: 128,
+                file_name: "bar.rs".into(),
+                line_start: 1,
+                line_end: 2,
             },
             Section {
-                file_name: "src/git.rs".to_string(),
-                line_start: 7,
+                file_name: "bar.rs".into(),
+                line_start: 5,
+                line_end: 9,
+            },
+            Section {
+                file_name: "foo.rs".into(),
+                line_start: 3,
+                line_end: 4,
+            },
+            Section {
+                file_name: "foo.rs".into(),
+                line_start: 6,
                 line_end: 7,
             },
-            Section {
-                file_name: "src/git.rs".to_string(),
-                line_start: 120,
-                line_end: 180,
-            },
         ];
-        let parser = Parser::new();
-        // Run
-        let actual_sections = parser.sections(&diff);
-        // Assert
-        assert_eq!(expected_sections, actual_sections);
+        let actual = get_sections(repo.path(), "master").unwrap();
+        assert_eq!(expected, actual);
+        Ok(())
     }
+
     #[test]
-    fn test_diff_several_extensions_files() {
-        use crate::git::{Parser, Section};
-        // Setup
-        let diff = std::fs::read_to_string("test_files/git/diff_several_extensions_files.patch").unwrap();
-        let expected_sections: Vec<Section> = vec![
+    fn mixed_extensions() -> Result<()> {
+        let repo = RepoFixture::new()?
+            .write("foo.rs", "test_files/git/mixed/foo.rs")?
+            .write("bar.txt", "test_files/git/mixed/bar.txt")?
+            .stage(&["foo.rs", "bar.txt"])?;
+
+        let expected = vec![Section {
+            file_name: "foo.rs".into(),
+            line_start: 1,
+            line_end: 7,
+        }];
+        let actual = get_sections(repo.path(), "master").unwrap();
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    #[test]
+    fn other_branch() -> Result<()> {
+        let repo = RepoFixture::new()?
+            .branch("other")?
+            .write("foo.rs", "test_files/git/modified/old/foo.rs")?
+            .stage(&["foo.rs"])?
+            .commit("other", &["foo.rs"])?
+            .write("foo.rs", "test_files/git/modified/new/foo.rs")?;
+
+        let expected = vec![
             Section {
-                file_name: "src/git.rs".to_string(),
-                line_start: 91,
-                line_end: 97,
+                file_name: "foo.rs".into(),
+                line_start: 3,
+                line_end: 4,
+            },
+            Section {
+                file_name: "foo.rs".into(),
+                line_start: 6,
+                line_end: 7,
             },
         ];
-        let parser = Parser::new();
-        // Run
-        let actual_sections = parser.sections(&diff);
-        // Assert
-        assert_eq!(expected_sections, actual_sections);
+        let actual = get_sections(repo.path(), "other").unwrap();
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    struct RepoFixture {
+        dir: TempDir,
+        repo: Repository,
+    }
+
+    impl RepoFixture {
+        pub fn new() -> Result<Self> {
+            let dir = TempDir::new()?;
+            let repo = Repository::init(dir.path())?;
+            {
+                // Set mandatory configuration
+                let mut config = repo.config()?;
+                config.set_str("user.name", "name")?;
+                config.set_str("user.email", "email")?;
+
+                // Write initial commit
+                let id = repo.index()?.write_tree()?;
+                let tree = repo.find_tree(id)?;
+                let sig = repo.signature()?;
+                repo.commit(Some("HEAD"), &sig, &sig, "initial", &tree, &[])?;
+            }
+            Ok(RepoFixture { dir, repo })
+        }
+
+        pub fn write(self, path: &str, test_file: &str) -> Result<Self> {
+            let contents = fs::read_to_string(test_file)?;
+            let mut file = File::create(self.dir.path().join(path))?;
+            file.write_all(contents.as_bytes())?;
+            Ok(self)
+        }
+
+        pub fn stage(self, paths: &[&str]) -> Result<Self> {
+            let mut index = self.repo.index()?;
+            for path in paths {
+                index.add_path(path.as_ref())?;
+            }
+            index.write()?;
+            Ok(self)
+        }
+
+        pub fn commit(self, branch: &str, paths: &[&str]) -> Result<Self> {
+            {
+                let mut index = self.repo.index()?;
+                for path in paths {
+                    index.add_path(path.as_ref())?;
+                }
+
+                let id = index.write_tree()?;
+                let tree = self.repo.find_tree(id)?;
+                let sig = self.repo.signature()?;
+
+                let target = self.repo.head()?.target().unwrap();
+                let parent = self.repo.find_commit(target)?;
+
+                let name = format!("refs/heads/{}", branch);
+                self.repo
+                    .commit(Some(&name), &sig, &sig, "some commit", &tree, &[&parent])?;
+            }
+            Ok(self)
+        }
+
+        pub fn branch(self, name: &str) -> Result<Self> {
+            {
+                let target = self.repo.head()?.target().unwrap();
+                let parent = self.repo.find_commit(target)?;
+
+                self.repo.branch(name, &parent, false)?;
+            }
+            Ok(self)
+        }
+
+        pub fn path(&self) -> &Path {
+            self.dir.path()
+        }
     }
 }
