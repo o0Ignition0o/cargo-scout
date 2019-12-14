@@ -7,6 +7,7 @@ pub struct Clippy {
     verbose: bool,
     no_default_features: bool,
     all_features: bool,
+    preview: bool,
 }
 
 impl Linter for Clippy {
@@ -22,6 +23,7 @@ impl Clippy {
             verbose: false,
             no_default_features: false,
             all_features: false,
+            preview: false,
         }
     }
 
@@ -40,8 +42,24 @@ impl Clippy {
         self
     }
 
+    pub fn set_preview(&mut self, preview: bool) -> &mut Self {
+        self.preview = preview;
+        self
+    }
+
     fn get_command_parameters(&self) -> Vec<&str> {
-        let mut params = vec!["clippy", "--message-format", "json"];
+        let mut params = if self.preview {
+            vec![
+                "+nightly",
+                "clippy-preview",
+                "-Z",
+                "unstable-options",
+                "--message-format",
+                "json",
+            ]
+        } else {
+            vec!["clippy", "--message-format", "json"]
+        };
         if self.verbose {
             params.push("--verbose");
         }
@@ -70,6 +88,7 @@ impl Clippy {
             .envs(self.get_envs())
             .output()
             .expect("failed to run clippy pedantic");
+
         if self.verbose {
             println!(
                 "{}",
@@ -202,6 +221,81 @@ mod tests {
         assert_eq!(
             all_features_command_parameters,
             all_features_linter.get_command_parameters()
+        );
+
+        let mut nightly_linter = Clippy::new();
+        let nightly_linter = nightly_linter.set_preview(true);
+        let expected_command_parameters = vec![
+            "+nightly",
+            "clippy-preview",
+            "-Z",
+            "unstable-options",
+            "--message-format",
+            "json",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            expected_command_parameters,
+            nightly_linter.get_command_parameters()
+        );
+
+        let nightly_verbose_linter = nightly_linter.set_verbose(true);
+        let verbose_expected_command_nightly_parameters = vec![
+            "+nightly",
+            "clippy-preview",
+            "-Z",
+            "unstable-options",
+            "--message-format",
+            "json",
+            "--verbose",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            verbose_expected_command_nightly_parameters,
+            nightly_verbose_linter.get_command_parameters()
+        );
+
+        let nightly_all_features_linter = nightly_linter.set_verbose(false).set_all_features(true);
+        let all_features_command_nightly_parameters = vec![
+            "+nightly",
+            "clippy-preview",
+            "-Z",
+            "unstable-options",
+            "--message-format",
+            "json",
+            "--all-features",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            all_features_command_nightly_parameters,
+            nightly_all_features_linter.get_command_parameters()
+        );
+
+        let nightly_no_default_features_linter = nightly_linter
+            .set_verbose(false)
+            .set_all_features(false)
+            .set_no_default_features(true);
+        let no_default_features_command_nightly_parameters = vec![
+            "+nightly",
+            "clippy-preview",
+            "-Z",
+            "unstable-options",
+            "--message-format",
+            "json",
+            "--no-default-features",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            no_default_features_command_nightly_parameters,
+            nightly_no_default_features_linter.get_command_parameters()
         );
     }
     #[test]

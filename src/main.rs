@@ -40,6 +40,9 @@ struct Options {
     #[structopt(short = "w", long = "without-error")]
     /// Set to display the warnings without actually returning an error
     without_error: bool,
+    #[structopt(short = "p", long = "preview")]
+    /// Enable nightly features (e.g. get lints even after the build has already been done.)
+    preview: bool,
 }
 
 fn display_warnings(warnings: &[Lint]) {
@@ -68,7 +71,8 @@ fn main() -> Result<(), error::Error> {
     clippy_linter
         .set_verbose(opts.verbose)
         .set_no_default_features(opts.no_default_features)
-        .set_all_features(opts.all_features);
+        .set_all_features(opts.all_features)
+        .set_preview(opts.preview);
 
     let mut scout_builder = scout::Builder::new();
     scout_builder
