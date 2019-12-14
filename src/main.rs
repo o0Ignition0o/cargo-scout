@@ -72,8 +72,8 @@ fn main() -> Result<(), error::Error> {
 
     let mut scout_builder = scout::Builder::new();
     scout_builder
-        .set_project_config(Box::new(project))
-        .set_linter(Box::new(clippy_linter));
+        .set_project_config(project)
+        .set_linter(clippy_linter);
     println!("Running clippy");
     let scout = scout_builder.build()?;
 
