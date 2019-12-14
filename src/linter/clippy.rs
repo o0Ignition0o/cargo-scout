@@ -7,6 +7,7 @@ pub struct Clippy {
     verbose: bool,
     no_default_features: bool,
     all_features: bool,
+    preview: bool,
 }
 
 impl Linter for Clippy {
@@ -22,6 +23,7 @@ impl Clippy {
             verbose: false,
             no_default_features: false,
             all_features: false,
+            preview: false,
         }
     }
 
@@ -40,6 +42,11 @@ impl Clippy {
         self
     }
 
+    pub fn set_preview(&mut self, preview: bool) -> &mut Self {
+        self.preview = preview;
+        self
+    }
+
     fn get_command_parameters(&self) -> Vec<&str> {
         let mut params = vec!["clippy", "--message-format", "json"];
         if self.verbose {
@@ -47,6 +54,26 @@ impl Clippy {
         }
         if self.no_default_features {
             params.push("--no-default-features");
+        }
+        if self.all_features {
+            params.push("--all-features");
+        }
+        params.append(&mut vec!["--", "-W", "clippy::pedantic"]);
+        params
+    }
+
+    fn get_nightly_parameters(&self) -> Vec<&str> {
+        let mut params = vec![
+            "+nightly",
+            "clippy-preview",
+            "-Z",
+            "unstable-options",
+            "--no-default-features",
+            "--message-format",
+            "json",
+        ];
+        if self.verbose {
+            params.push("--verbose");
         }
         if self.all_features {
             params.push("--all-features");
@@ -64,12 +91,18 @@ impl Clippy {
     }
 
     fn clippy(&self, path: impl AsRef<std::path::Path>) -> Result<String, crate::error::Error> {
+        let clippy_mode = if self.preview {
+            self.get_nightly_parameters()
+        } else {
+            self.get_command_parameters()
+        };
         let clippy_pedantic_output = Command::new("cargo")
             .current_dir(path)
-            .args(self.get_command_parameters())
+            .args(clippy_mode)
             .envs(self.get_envs())
             .output()
             .expect("failed to run clippy pedantic");
+
         if self.verbose {
             println!(
                 "{}",
@@ -202,6 +235,62 @@ mod tests {
         assert_eq!(
             all_features_command_parameters,
             all_features_linter.get_command_parameters()
+        );
+    }
+    #[test]
+    fn test_get_nightly_parameters() {
+        let mut linter = Clippy::new();
+        let expected_command_parameters = vec![
+            "+nightly",
+            "clippy-preview",
+            "-Z",
+            "unstable-options",
+            "--no-default-features",
+            "--message-format",
+            "json",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+
+        assert_eq!(expected_command_parameters, linter.get_nightly_parameters());
+
+        let verbose_linter = linter.set_verbose(true);
+        let verbose_expected_command_parameters = vec![
+            "+nightly",
+            "clippy-preview",
+            "-Z",
+            "unstable-options",
+            "--no-default-features",
+            "--message-format",
+            "json",
+            "--verbose",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            verbose_expected_command_parameters,
+            verbose_linter.get_nightly_parameters()
+        );
+
+        let all_features_linter = linter.set_verbose(false).set_all_features(true);
+        let all_features_command_parameters = vec![
+            "+nightly",
+            "clippy-preview",
+            "-Z",
+            "unstable-options",
+            "--no-default-features",
+            "--message-format",
+            "json",
+            "--all-features",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            all_features_command_parameters,
+            all_features_linter.get_nightly_parameters()
         );
     }
     #[test]
