@@ -1,5 +1,6 @@
 #[derive(Debug)]
 pub enum Error {
+    ScoutBuilder,
     CargoToml(cargo_toml::Error),
     Command(String),
     Utf8(std::string::FromUtf8Error),

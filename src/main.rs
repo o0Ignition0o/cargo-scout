@@ -1,11 +1,13 @@
+use crate::linter::clippy::Clippy;
+use crate::linter::Lint;
 use std::env;
 use structopt::StructOpt;
 
-mod cargo;
-mod clippy;
 mod error;
 mod git;
-mod intersections;
+mod linter;
+mod project;
+mod scout;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -40,7 +42,7 @@ struct Options {
     without_error: bool,
 }
 
-fn display_warnings(warnings: &[clippy::Lint]) {
+fn display_warnings(warnings: &[Lint]) {
     for w in warnings {
         if let Some(m) = &w.message {
             for l in m.rendered.split('\n') {
@@ -56,40 +58,46 @@ fn main() -> Result<(), error::Error> {
 
     println!("Getting diff against target {}", opts.branch);
     let diff_sections = git::get_sections(env::current_dir()?, &opts.branch)?;
+
     println!("Checking Cargo manifest");
-    let manifest = cargo::Parser::from_manifest_path(opts.cargo_toml)?;
-    if manifest.is_workspace() {
-        println!("Running in workspace, please note feature flags are not supported yet.");
-    }
-    println!("Running clippy");
-    let clippy_lints = clippy::Linter::new()
+    let mut project = project::cargo::Project::from_manifest_path(opts.cargo_toml)?;
+    project.set_all_features(opts.all_features);
+    project.set_no_default_features(opts.no_default_features);
+
+    let mut clippy_linter = Clippy::new();
+    clippy_linter
         .set_verbose(opts.verbose)
         .set_no_default_features(opts.no_default_features)
-        .set_all_features(opts.all_features)
-        .get_lints()?;
+        .set_all_features(opts.all_features);
 
-    let warnings_caused_by_diff =
-        intersections::get_lints_from_diff(&clippy_lints, &diff_sections, opts.verbose);
+    let mut scout_builder = scout::Builder::new();
+    scout_builder
+        .set_project_config(Box::new(project))
+        .set_linter(Box::new(clippy_linter));
+    println!("Running clippy");
+    let scout = scout_builder.build()?;
 
-    return_warnings(&warnings_caused_by_diff, opts.without_error)
+    let relevant_lints = scout.run_for_diff(&diff_sections)?;
+    return_warnings(&relevant_lints, opts.without_error)
 }
 
-fn return_warnings(lints: &[clippy::Lint], without_error: bool) -> Result<(), error::Error> {
+fn return_warnings(lints: &[linter::Lint], without_error: bool) -> Result<(), error::Error> {
     if lints.is_empty() {
         println!("No warnings raised by clippy::pedantic in your diff, you're good to go!");
         Ok(())
     } else {
         display_warnings(&lints);
         if without_error {
-            return Ok(());
+            Ok(())
+        } else {
+            Err(error::Error::NotClean)
         }
-        Err(error::Error::NotClean)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::clippy::Lint;
+    use crate::linter::Lint;
     use crate::return_warnings;
     #[test]
     fn test_return_status_with_lints() {
