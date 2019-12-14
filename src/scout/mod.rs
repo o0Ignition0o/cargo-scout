@@ -2,17 +2,29 @@ use crate::git::Section;
 use crate::linter::Lint;
 use crate::linter::Span;
 
-pub struct Builder {
-    project: Option<Box<dyn crate::project::Config>>,
-    linter: Option<Box<dyn crate::linter::Linter>>,
+pub struct Builder<C, L>
+where
+    C: crate::project::Config,
+    L: crate::linter::Linter,
+{
+    project: Option<C>,
+    linter: Option<L>,
 }
 
-pub struct Scout {
-    project: Box<dyn crate::project::Config>,
-    linter: Box<dyn crate::linter::Linter>,
+pub struct Scout<C, L>
+where
+    C: crate::project::Config,
+    L: crate::linter::Linter,
+{
+    project: C,
+    linter: L,
 }
 
-impl Scout {
+impl<C, L> Scout<C, L>
+where
+    C: crate::project::Config,
+    L: crate::linter::Linter,
+{
     pub fn run_for_diff(
         &self,
         diff_sections: &[Section],
@@ -36,7 +48,11 @@ impl Scout {
     }
 }
 
-impl Builder {
+impl<C, L> Builder<C, L>
+where
+    C: crate::project::Config,
+    L: crate::linter::Linter,
+{
     pub fn new() -> Self {
         Self {
             project: None,
@@ -44,17 +60,17 @@ impl Builder {
         }
     }
 
-    pub fn set_project_config(&mut self, project: Box<dyn crate::project::Config>) -> &mut Self {
+    pub fn set_project_config(&mut self, project: C) -> &mut Self {
         self.project = Some(project);
         self
     }
 
-    pub fn set_linter(&mut self, linter: Box<dyn crate::linter::Linter>) -> &mut Self {
+    pub fn set_linter(&mut self, linter: L) -> &mut Self {
         self.linter = Some(linter);
         self
     }
 
-    pub fn build(self) -> Result<Scout, crate::error::Error> {
+    pub fn build(self) -> Result<Scout<C, L>, crate::error::Error> {
         match (self.project, self.linter) {
             (Some(p), Some(l)) => Ok(Scout {
                 project: p,
@@ -156,8 +172,7 @@ mod scout_tests {
         let actual_times_called = Rc::clone(&linter.lints_times_called);
 
         let mut sb = Builder::new();
-        sb.set_linter(Box::new(linter))
-            .set_project_config(Box::new(project));
+        sb.set_linter(linter).set_project_config(project);
         let scout = sb.build()?;
         // We don't check for the lints result here.
         // It is already tested in the linter tests
@@ -182,8 +197,7 @@ mod scout_tests {
         let actual_times_called = Rc::clone(&linter.lints_times_called);
 
         let mut sb = Builder::new();
-        sb.set_linter(Box::new(linter))
-            .set_project_config(Box::new(project));
+        sb.set_linter(linter).set_project_config(project);
         let scout = sb.build()?;
         // We don't check for the lints result here.
         // It is already tested in the linter tests
