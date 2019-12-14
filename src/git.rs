@@ -16,7 +16,10 @@ where
     let repo = Repository::discover(repo_path)?;
     let tree = repo.revparse_single(branch)?.peel_to_tree()?;
     let mut config = DiffOptions::default();
-    config.context_lines(0);
+    config
+        .context_lines(0)
+        .show_untracked_content(true)
+        .recurse_untracked_dirs(true);
 
     let diff = repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut config))?;
     let mut sections = Vec::new();
@@ -26,7 +29,7 @@ where
         None,
         Some(&mut |delta, hunk| {
             match delta.status() {
-                Delta::Modified | Delta::Added => {
+                Delta::Modified | Delta::Added | Delta::Untracked => {
                     if let Some(file_path) = delta.new_file().path() {
                         let file_path = file_path.to_string_lossy().to_string();
 
@@ -84,6 +87,29 @@ mod tests {
                 file_name: "foo.rs".into(),
                 line_start: 1,
                 line_end: 7,
+            },
+        ];
+        let actual = get_sections(repo.path(), "master").unwrap();
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    #[test]
+    fn untracked_files() -> Result<()> {
+        let repo = RepoFixture::new()?
+            .write("foo.rs", "test_files/git/added/foo.rs")?
+            .write("inside/some/dir/bar.rs", "test_files/git/added/bar.rs")?;
+
+        let expected = vec![
+            Section {
+                file_name: "foo.rs".into(),
+                line_start: 1,
+                line_end: 7,
+            },
+            Section {
+                file_name: "inside/some/dir/bar.rs".into(),
+                line_start: 1,
+                line_end: 5,
             },
         ];
         let actual = get_sections(repo.path(), "master").unwrap();
@@ -196,7 +222,10 @@ mod tests {
             Ok(RepoFixture { dir, repo })
         }
 
-        pub fn write(self, path: &str, test_file: &str) -> Result<Self> {
+        pub fn write<P: AsRef<Path>>(self, path: P, test_file: &str) -> Result<Self> {
+            let parent_dir = path.as_ref().parent().unwrap();
+            fs::create_dir_all(self.dir.path().join(parent_dir))?;
+
             let contents = fs::read_to_string(test_file)?;
             let mut file = File::create(self.dir.path().join(path))?;
             file.write_all(contents.as_bytes())?;
