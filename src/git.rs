@@ -65,7 +65,7 @@ mod tests {
     fn no_changes() -> Result<()> {
         let repo = RepoFixture::new()?;
 
-        let sections = get_sections(repo.path(), "master").unwrap();
+        let sections = get_sections(repo.path(), "master")?;
         assert!(sections.is_empty());
         Ok(())
     }
@@ -89,7 +89,7 @@ mod tests {
                 line_end: 7,
             },
         ];
-        let actual = get_sections(repo.path(), "master").unwrap();
+        let actual = get_sections(repo.path(), "master")?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -112,7 +112,7 @@ mod tests {
                 line_end: 5,
             },
         ];
-        let actual = get_sections(repo.path(), "master").unwrap();
+        let actual = get_sections(repo.path(), "master")?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -150,7 +150,7 @@ mod tests {
                 line_end: 7,
             },
         ];
-        let actual = get_sections(repo.path(), "master").unwrap();
+        let actual = get_sections(repo.path(), "master")?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -167,7 +167,7 @@ mod tests {
             line_start: 1,
             line_end: 7,
         }];
-        let actual = get_sections(repo.path(), "master").unwrap();
+        let actual = get_sections(repo.path(), "master")?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -193,7 +193,7 @@ mod tests {
                 line_end: 7,
             },
         ];
-        let actual = get_sections(repo.path(), "other").unwrap();
+        let actual = get_sections(repo.path(), "other")?;
         assert_eq!(expected, actual);
         Ok(())
     }
