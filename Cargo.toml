@@ -1,6 +1,6 @@
 [package]
 name = "cargo-scout"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["o0Ignition0o <jeremy.lempereur@gmail.com>"]
 description = "Run clippy::pedantic on your diffs only"
 homepage = "https://github.com/o0Ignition0o/cargo-scout"
