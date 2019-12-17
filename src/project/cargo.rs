@@ -1,14 +1,14 @@
-use crate::project::Config;
+use crate::project::Config as ProjectConfig;
 use serde::Deserialize;
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]
-pub struct Project {
+pub struct Config {
     no_default_features: bool,
     all_features: bool,
     members: Vec<String>,
 }
 
-impl Config for Project {
+impl ProjectConfig for Config {
     fn linter_must_iterate(&self) -> bool {
         !self.members.is_empty() && (self.no_default_features || self.all_features)
     }
@@ -17,7 +17,7 @@ impl Config for Project {
     }
 }
 
-impl Project {
+impl Config {
     pub fn from_manifest_path(p: impl AsRef<std::path::Path>) -> Result<Self, crate::error::Error> {
         Ok(Self::from_manifest(cargo_toml::Manifest::from_path(p)?))
     }
@@ -51,19 +51,20 @@ impl Project {
 
 #[cfg(test)]
 mod tests {
+    use crate::project::cargo::Config;
+    use crate::project::Config as ProjectConfig;
+
     #[test]
     fn test_not_workspace_manifest() {
-        use crate::project::cargo::Project;
-        use crate::project::Config;
         let no_members: Vec<String> = Vec::new();
         let manifest = cargo_toml::Manifest::from_path("Cargo.toml").unwrap();
         // Make sure we actually parsed the manifest
         assert_eq!("cargo-scout", manifest.clone().package.unwrap().name);
-        let mut project = Project::from_manifest(manifest);
+        let mut project = Config::from_manifest(manifest);
         assert!(!project.linter_must_iterate());
         assert_eq!(no_members, project.get_members());
 
-        // Project must not iterate if not running in a workspace,
+        // Config must not iterate if not running in a workspace,
         // regardless of the passed flags
         project.set_all_features(true);
         assert!(!project.linter_must_iterate());
@@ -74,14 +75,12 @@ mod tests {
     }
     #[test]
     fn test_not_workspace_path() {
-        use crate::project::cargo::Project;
-        use crate::project::Config;
         let no_members: Vec<String> = Vec::new();
-        let mut project = Project::from_manifest_path("Cargo.toml").unwrap();
+        let mut project = Config::from_manifest_path("Cargo.toml").unwrap();
         assert!(!project.linter_must_iterate());
         assert_eq!(no_members, project.get_members());
 
-        // Project must not iterate if not running in a workspace,
+        // Config must not iterate if not running in a workspace,
         // regardless of the passed flags
         project.set_all_features(true);
         assert!(!project.linter_must_iterate());
@@ -92,8 +91,6 @@ mod tests {
     }
     #[test]
     fn test_neqo_members_manifest() {
-        use crate::project::cargo::Project;
-        use crate::project::Config;
         let neqo_toml = r#"[workspace]
         members = [
           "neqo-client",
@@ -110,7 +107,7 @@ mod tests {
 
         let manifest = cargo_toml::Manifest::from_slice(neqo_toml.as_bytes()).unwrap();
 
-        let mut project = Project::from_manifest(manifest);
+        let mut project = Config::from_manifest(manifest);
 
         assert!(!project.linter_must_iterate());
         assert_eq!(
@@ -128,7 +125,7 @@ mod tests {
             ],
             project.get_members()
         );
-        // Project must iterate if running in a workspace
+        // Config must iterate if running in a workspace
         // With all features or no default features is enabled
         project.set_all_features(true);
         assert!(project.linter_must_iterate());
