@@ -1,4 +1,5 @@
-use cargo_scout::{run, Error, Lint, ScoutOptions};
+use cargo_scout::project::cargo::Config;
+use cargo_scout::{run, Clippy, Error, Lint, ScoutOptions};
 pub use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -53,7 +54,20 @@ impl From<Options> for ScoutOptions {
 fn main() -> Result<(), Error> {
     let opts = Options::from_args();
     let fail_if_errors = opts.without_error;
-    let relevant_lints = run(opts.into())?;
+
+    println!("Checking Cargo manifest");
+    let mut project = Config::from_manifest_path(opts.cargo_toml)?;
+    project.set_all_features(opts.all_features);
+    project.set_no_default_features(opts.no_default_features);
+
+    let mut linter = Clippy::new();
+    linter
+        .set_verbose(opts.verbose)
+        .set_no_default_features(opts.no_default_features)
+        .set_all_features(opts.all_features)
+        .set_preview(opts.preview);
+
+    let relevant_lints = run(&opts.branch, project, linter)?;
     return_warnings(&relevant_lints, fail_if_errors)
 }
 
