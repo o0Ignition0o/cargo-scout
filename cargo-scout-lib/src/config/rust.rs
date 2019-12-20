@@ -2,6 +2,7 @@ use crate::config::Config;
 use serde::Deserialize;
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]
+/// This struct represents a Cargo project configuration.
 pub struct CargoConfig {
     members: Vec<String>,
 }
@@ -14,6 +15,32 @@ impl Config for CargoConfig {
 }
 
 impl CargoConfig {
+    /// This function will instanciate a Config from a Cargo.toml path.
+    ///
+    /// If in a workspace, `get_members` will return the members
+    /// of the [[workspace]] members section in Cargo.toml.
+    ///
+    /// Else, it will return `vec![".".to_string()]`
+    ///
+    /// # cargo-scout-lib example
+    /// ```
+    /// # use cargo_scout_lib::config::Config;
+    /// # use cargo_scout_lib::config::rust::CargoConfig;
+    /// let config = CargoConfig::from_manifest_path("Cargo.toml")?;
+    /// // There is only one directory to lint, which is the current one.
+    /// assert_eq!(vec!["."], config.get_members());
+    /// # Ok::<(), cargo_scout_lib::error::Error>(())
+    /// ```
+    ///
+    /// # cargo-scout workspace example
+    /// ```
+    /// # use cargo_scout_lib::config::Config;
+    /// # use cargo_scout_lib::config::rust::CargoConfig;
+    /// let config = CargoConfig::from_manifest_path("../Cargo.toml")?;
+    /// // We will lint `./cargo-scout` and `./cargo-scout-lib`.
+    /// assert_eq!(vec!["cargo-scout".to_string(), "cargo-scout-lib".to_string()], config.get_members());
+    /// # Ok::<(), cargo_scout_lib::error::Error>(())
+    /// ```
     pub fn from_manifest_path(p: impl AsRef<std::path::Path>) -> Result<Self, crate::error::Error> {
         Ok(Self::from_manifest(cargo_toml::Manifest::from_path(p)?))
     }
