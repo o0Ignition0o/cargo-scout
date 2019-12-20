@@ -30,16 +30,11 @@ where
         let diff_sections = self.vcs.get_sections(".")?;
         let current_dir = std::fs::canonicalize(".")?;
         let mut lints = Vec::new();
-        if self.config.linter_must_iterate() {
-            let members = self.config.get_members();
-            // There's no need to run the linter on members where no changes have been made
-            let relevant_members = members.iter().filter(|m| diff_in_member(m, &diff_sections));
-            for m in relevant_members {
-                lints.extend(self.linter.get_lints(current_dir.join(m))?);
-            }
-        // There's no need to run the linter if no changes have been made
-        } else if !diff_sections.is_empty() {
-            lints.extend(self.linter.get_lints(current_dir)?);
+        let members = self.config.get_members();
+        // There's no need to run the linter on members where no changes have been made
+        let relevant_members = members.iter().filter(|m| diff_in_member(m, &diff_sections));
+        for m in relevant_members {
+            lints.extend(self.linter.get_lints(current_dir.join(m))?);
         }
         println!("[Scout] - checking for intersections");
         Ok(get_lints_from_diff(&lints, &diff_sections))
@@ -68,8 +63,7 @@ fn files_match(clippy_lint: &Span, git_section: &Section) -> bool {
     clippy_lint.file_name.replace("\\", "/") == git_section.file_name.replace("\\", "/")
 }
 
-#[must_use]
-pub fn get_lints_from_diff(lints: &[Lint], diffs: &[Section]) -> Vec<Lint> {
+fn get_lints_from_diff(lints: &[Lint], diffs: &[Section]) -> Vec<Lint> {
     let mut lints_in_diff = Vec::new();
     for diff in diffs {
         let diff_lints = lints.iter().filter(|lint| {
@@ -147,9 +141,6 @@ mod scout_tests {
         }
     }
     impl Config for TestConfig {
-        fn linter_must_iterate(&self) -> bool {
-            !self.get_members().is_empty()
-        }
         fn get_members(&self) -> Vec<String> {
             self.members.clone()
         }

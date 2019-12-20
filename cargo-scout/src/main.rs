@@ -46,18 +46,14 @@ fn main() -> Result<(), Error> {
     let opts = Options::from_args();
     let fail_if_errors = opts.without_error;
 
-    let mut config = CargoConfig::from_manifest_path(opts.cargo_toml)?;
-    config.set_all_features(opts.all_features);
-    config.set_no_default_features(opts.no_default_features);
-
+    let vcs = Git::with_target(opts.branch);
+    let config = CargoConfig::from_manifest_path(opts.cargo_toml)?;
     let mut linter = Clippy::default();
     linter
         .set_verbose(opts.verbose)
         .set_no_default_features(opts.no_default_features)
         .set_all_features(opts.all_features)
         .set_preview(opts.preview);
-
-    let vcs = Git::with_target(opts.branch);
 
     let scout = Scout::new(vcs, config, linter);
     let relevant_lints = scout.run()?;
