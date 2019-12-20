@@ -1,4 +1,4 @@
-pub mod cargo;
+pub mod rust;
 
 pub trait Config {
     fn linter_must_iterate(&self) -> bool;
