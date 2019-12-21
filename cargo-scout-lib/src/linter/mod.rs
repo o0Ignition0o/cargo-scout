@@ -4,24 +4,7 @@ use std::path::PathBuf;
 pub mod clippy;
 
 pub trait Linter {
-    fn get_lints(&self, working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error>;
-}
-
-#[derive(Deserialize, PartialEq, Debug)]
-struct LintCode {
-    code: String,
-    explanation: String,
-}
-
-#[derive(Deserialize, PartialEq, Debug)]
-struct LintSpan {
-    file_name: String,
-    /// The line where the lint should be reported
-    ///
-    /// GitHub provides a line_start and a line_end.
-    /// We should use the line_start in case of multi-line lints.
-    /// (Why?)
-    line_start: usize,
+    fn lints(&self, working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error>;
 }
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]

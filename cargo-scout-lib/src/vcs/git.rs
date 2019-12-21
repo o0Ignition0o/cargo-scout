@@ -24,7 +24,7 @@ impl Git {
 }
 
 impl VCS for Git {
-    fn get_sections<P>(&self, repo_path: P) -> Result<Vec<Section>, Error>
+    fn sections<P>(&self, repo_path: P) -> Result<Vec<Section>, Error>
     where
         P: AsRef<Path>,
     {
@@ -78,7 +78,7 @@ mod tests {
     fn no_changes() -> Result<()> {
         let repo = RepoFixture::new()?;
         let git = Git::default();
-        let sections = git.get_sections(repo.path())?;
+        let sections = git.sections(repo.path())?;
         assert!(sections.is_empty());
         Ok(())
     }
@@ -104,7 +104,7 @@ mod tests {
         ];
 
         let git = Git::default();
-        let actual = git.get_sections(repo.path())?;
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -129,7 +129,7 @@ mod tests {
         ];
 
         let git = Git::default();
-        let actual = git.get_sections(repo.path())?;
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -169,7 +169,7 @@ mod tests {
         ];
 
         let git = Git::default();
-        let actual = git.get_sections(repo.path())?;
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -188,7 +188,7 @@ mod tests {
         }];
 
         let git = Git::default();
-        let actual = git.get_sections(repo.path())?;
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -216,7 +216,7 @@ mod tests {
         ];
 
         let git = Git::with_target("other".to_string());
-        let actual = git.get_sections(repo.path())?;
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }

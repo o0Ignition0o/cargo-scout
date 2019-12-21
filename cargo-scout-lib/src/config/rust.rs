@@ -1,7 +1,5 @@
 use crate::config::Config;
-use serde::Deserialize;
 
-#[derive(Deserialize, PartialEq, Debug, Clone)]
 /// This struct represents a Cargo project configuration.
 pub struct CargoConfig {
     members: Vec<String>,
@@ -9,13 +7,13 @@ pub struct CargoConfig {
 
 impl Config for CargoConfig {
     #[must_use]
-    fn get_members(&self) -> Vec<String> {
+    fn members(&self) -> Vec<String> {
         self.members.clone()
     }
 }
 
 impl CargoConfig {
-    /// This function will instanciate a Config from a Cargo.toml path.
+    /// This function will instantiate a Config from a Cargo.toml path.
     ///
     /// If in a workspace, `get_members` will return the members
     /// of the [[workspace]] members section in Cargo.toml.
@@ -28,8 +26,8 @@ impl CargoConfig {
     /// # use cargo_scout_lib::config::rust::CargoConfig;
     /// let config = CargoConfig::from_manifest_path("Cargo.toml")?;
     /// // There is only one directory to lint, which is the current one.
-    /// assert_eq!(vec!["."], config.get_members());
-    /// # Ok::<(), cargo_scout_lib::error::Error>(())
+    /// assert_eq!(vec!["."], config.members());
+    /// # Ok::<(), cargo_scout_lib::Error>(())
     /// ```
     ///
     /// # cargo-scout workspace example
@@ -38,8 +36,8 @@ impl CargoConfig {
     /// # use cargo_scout_lib::config::rust::CargoConfig;
     /// let config = CargoConfig::from_manifest_path("../Cargo.toml")?;
     /// // We will lint `./cargo-scout` and `./cargo-scout-lib`.
-    /// assert_eq!(vec!["cargo-scout".to_string(), "cargo-scout-lib".to_string()], config.get_members());
-    /// # Ok::<(), cargo_scout_lib::error::Error>(())
+    /// assert_eq!(vec!["cargo-scout".to_string(), "cargo-scout-lib".to_string()], config.members());
+    /// # Ok::<(), cargo_scout_lib::Error>(())
     /// ```
     pub fn from_manifest_path(p: impl AsRef<std::path::Path>) -> Result<Self, crate::error::Error> {
         Ok(Self::from_manifest(cargo_toml::Manifest::from_path(p)?))
@@ -68,12 +66,12 @@ mod tests {
         // Make sure we actually parsed the manifest
         assert_eq!("cargo-scout-lib", manifest.clone().package.unwrap().name);
         let config = CargoConfig::from_manifest(manifest);
-        assert_eq!(vec!["."], config.get_members());
+        assert_eq!(vec!["."], config.members());
     }
     #[test]
     fn test_not_workspace_path() {
         let config = CargoConfig::from_manifest_path("Cargo.toml").unwrap();
-        assert_eq!(vec!["."], config.get_members());
+        assert_eq!(vec!["."], config.members());
     }
     #[test]
     fn test_neqo_members_manifest() {
@@ -106,7 +104,7 @@ mod tests {
                 "neqo-interop",
                 "test-fixture"
             ],
-            config.get_members()
+            config.members()
         );
     }
 }

@@ -1,9 +1,9 @@
 use cargo_scout_lib::config::rust::CargoConfig;
-use cargo_scout_lib::error::Error;
 use cargo_scout_lib::linter::clippy::Clippy;
 use cargo_scout_lib::linter::Lint;
 use cargo_scout_lib::scout::Scout;
 use cargo_scout_lib::vcs::git::Git;
+use cargo_scout_lib::Error;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]

@@ -27,17 +27,17 @@ where
         }
     }
     pub fn run(&self) -> Result<Vec<Lint>, crate::error::Error> {
-        let diff_sections = self.vcs.get_sections(".")?;
+        let diff_sections = self.vcs.sections(".")?;
         let current_dir = std::fs::canonicalize(".")?;
         let mut lints = Vec::new();
-        let members = self.config.get_members();
+        let members = self.config.members();
         // There's no need to run the linter on members where no changes have been made
         let relevant_members = members.iter().filter(|m| diff_in_member(m, &diff_sections));
         for m in relevant_members {
-            lints.extend(self.linter.get_lints(current_dir.join(m))?);
+            lints.extend(self.linter.lints(current_dir.join(m))?);
         }
         println!("[Scout] - checking for intersections");
-        Ok(get_lints_from_diff(&lints, &diff_sections))
+        Ok(lints_from_diff(&lints, &diff_sections))
     }
 }
 
@@ -63,7 +63,7 @@ fn files_match(clippy_lint: &Span, git_section: &Section) -> bool {
     clippy_lint.file_name.replace("\\", "/") == git_section.file_name.replace("\\", "/")
 }
 
-fn get_lints_from_diff(lints: &[Lint], diffs: &[Section]) -> Vec<Lint> {
+fn lints_from_diff(lints: &[Lint], diffs: &[Section]) -> Vec<Lint> {
     let mut lints_in_diff = Vec::new();
     for diff in diffs {
         let diff_lints = lints.iter().filter(|lint| {
@@ -97,24 +97,24 @@ mod scout_tests {
     use std::rc::Rc;
     struct TestVCS {
         sections: Vec<Section>,
-        get_sections_called: RefCell<bool>,
+        sections_called: RefCell<bool>,
     }
     impl TestVCS {
         pub fn new(sections: Vec<Section>) -> Self {
             Self {
                 sections,
-                get_sections_called: RefCell::new(false),
+                sections_called: RefCell::new(false),
             }
         }
     }
     impl VCS for TestVCS {
-        fn get_sections<P: AsRef<Path>>(&self, _: P) -> Result<Vec<Section>, Error> {
-            *self.get_sections_called.borrow_mut() = true;
+        fn sections<P: AsRef<Path>>(&self, _: P) -> Result<Vec<Section>, Error> {
+            *self.sections_called.borrow_mut() = true;
             Ok(self.sections.clone())
         }
     }
     struct TestLinter {
-        // Using a RefCell here because get_lints
+        // Using a RefCell here becauselints
         // takes &self and not &mut self.
         // We use usize here because we will compare it to a Vec::len()
         lints_times_called: Rc<RefCell<usize>>,
@@ -127,7 +127,7 @@ mod scout_tests {
         }
     }
     impl Linter for TestLinter {
-        fn get_lints(&self, _working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
+        fn lints(&self, _working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
             *self.lints_times_called.borrow_mut() += 1;
             Ok(Vec::new())
         }
@@ -141,7 +141,7 @@ mod scout_tests {
         }
     }
     impl Config for TestConfig {
-        fn get_members(&self) -> Vec<String> {
+        fn members(&self) -> Vec<String> {
             self.members.clone()
         }
     }

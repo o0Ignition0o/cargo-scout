@@ -26,13 +26,13 @@ pub trait Config {
     /// # }
     /// # // Your own implementation goes here
     /// # impl Config for CustomConfig {
-    /// #    fn get_members(&self) -> Vec<String> {
+    /// #    fn members(&self) -> Vec<String> {
     /// #        vec![".".to_string()]
     /// #    }
     /// # }
     /// let config = CustomConfig::new();
     /// // Only the current directory must be linted
-    /// assert_eq!(vec![".".to_string()], config.get_members());
+    /// assert_eq!(vec![".".to_string()], config.members());
     /// ```
     ///
     /// # Example with two subdirectories
@@ -46,13 +46,13 @@ pub trait Config {
     /// # }
     /// # // Your own implementation goes here
     /// # impl Config for CustomConfig {
-    /// #    fn get_members(&self) -> Vec<String> {
+    /// #    fn members(&self) -> Vec<String> {
     /// #        vec!["foo".to_string(), "bar".to_string()]
     /// #    }
     /// # }
     /// let config = CustomConfig::new();
     /// // Directories ./foo and ./bar must be linted
-    /// assert_eq!(vec!["foo".to_string(), "bar".to_string()], config.get_members());
+    /// assert_eq!(vec!["foo".to_string(), "bar".to_string()], config.members());
     /// ```
     ///
     /// # Implementing your own Config
@@ -67,12 +67,12 @@ pub trait Config {
     /// #   }
     /// # }
     /// impl Config for CustomConfig {
-    ///    fn get_members(&self) -> Vec<String> {
+    ///    fn members(&self) -> Vec<String> {
     ///        // Your own code to fetch the list of
     ///        // directories to iterate on goes here
     ///        # vec![".".to_string()]
     ///    }
     /// }
     /// ```
-    fn get_members(&self) -> Vec<String>;
+    fn members(&self) -> Vec<String>;
 }

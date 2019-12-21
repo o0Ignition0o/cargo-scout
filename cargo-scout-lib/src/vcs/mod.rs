@@ -3,7 +3,7 @@ use crate::error::Error;
 use std::path::Path;
 
 pub trait VCS {
-    fn get_sections<P>(&self, repo_path: P) -> Result<Vec<Section>, Error>
+    fn sections<P>(&self, repo_path: P) -> Result<Vec<Section>, Error>
     where
         P: AsRef<Path>;
 }
