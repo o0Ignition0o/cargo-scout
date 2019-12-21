@@ -8,41 +8,52 @@ pub trait Linter {
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
-pub struct LintCode {
-    pub code: String,
-    pub explanation: String,
+struct LintCode {
+    code: String,
+    explanation: String,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
-pub struct LintSpan {
-    pub file_name: String,
+struct LintSpan {
+    file_name: String,
     /// The line where the lint should be reported
     ///
     /// GitHub provides a line_start and a line_end.
     /// We should use the line_start in case of multi-line lints.
     /// (Why?)
-    pub line_start: usize,
+    line_start: usize,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]
+/// A `Linter`s output is a `Vec<Lint>`
 pub struct Lint {
-    /// The lint message
-    ///
+    /// The package id
     /// Example:
-    ///
-    /// unused variable: `count`
+    /// "cargo-scout-lib".to_string()
     pub package_id: String,
+    /// The file the lint was reported on
+    /// Example:
+    /// Some("src/lib.rs".to_string())
     pub src_path: Option<String>,
+    /// The message structure
     pub message: Option<Message>,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]
+/// This struct contains the message output,
+/// and a `Vec<Span>` with the message location
 pub struct Message {
+    /// The message string
+    /// Example:
+    /// unused variable `count`
     pub rendered: String,
+    /// The file names and lines the lint
+    /// was reported on
     pub spans: Vec<Span>,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]
+/// A `Span` has a file name, a start and an end line
 pub struct Span {
     pub file_name: String,
     pub line_start: u32,
