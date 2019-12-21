@@ -1,55 +1,68 @@
+use super::*;
 use crate::error::Error;
 use git2::{Delta, DiffOptions, Repository};
 use std::path::Path;
 
-#[derive(Debug, PartialEq)]
-pub struct Section {
-    pub file_name: String,
-    pub line_start: u32,
-    pub line_end: u32,
+pub struct Git {
+    target_branch: String,
 }
 
-pub fn get_sections<P>(repo_path: P, branch: &str) -> Result<Vec<Section>, Error>
-where
-    P: AsRef<Path>,
-{
-    let repo = Repository::discover(repo_path)?;
-    let tree = repo.revparse_single(branch)?.peel_to_tree()?;
-    let mut config = DiffOptions::default();
-    config
-        .context_lines(0)
-        .show_untracked_content(true)
-        .recurse_untracked_dirs(true);
+impl Default for Git {
+    #[must_use]
+    fn default() -> Self {
+        Self {
+            target_branch: "master".to_string(),
+        }
+    }
+}
 
-    let diff = repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut config))?;
-    let mut sections = Vec::new();
+impl Git {
+    #[must_use]
+    pub fn with_target(target_branch: String) -> Self {
+        Self { target_branch }
+    }
+}
 
-    diff.foreach(
-        &mut |_delta, _progress| true,
-        None,
-        Some(&mut |delta, hunk| {
-            match delta.status() {
-                Delta::Modified | Delta::Added | Delta::Untracked => {
-                    if let Some(file_path) = delta.new_file().path() {
-                        let file_path = file_path.to_string_lossy().to_string();
-
-                        if file_path.ends_with(".rs") {
-                            sections.push(Section {
-                                file_name: file_path,
-                                line_start: hunk.new_start(),
-                                line_end: hunk.new_start() + hunk.new_lines(),
-                            });
+impl VCS for Git {
+    fn sections<P>(&self, repo_path: P) -> Result<Vec<Section>, Error>
+    where
+        P: AsRef<Path>,
+    {
+        println!("[VCS] - Getting diff with target {}", &self.target_branch);
+        let repo = Repository::discover(repo_path)?;
+        let tree = repo.revparse_single(&self.target_branch)?.peel_to_tree()?;
+        let mut config = DiffOptions::default();
+        config
+            .context_lines(0)
+            .show_untracked_content(true)
+            .recurse_untracked_dirs(true);
+        let diff = repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut config))?;
+        let mut sections = Vec::new();
+        diff.foreach(
+            &mut |_delta, _progress| true,
+            None,
+            Some(&mut |delta, hunk| {
+                match delta.status() {
+                    Delta::Modified | Delta::Added | Delta::Untracked => {
+                        if let Some(file_path) = delta.new_file().path() {
+                            let file_path = file_path.to_string_lossy().to_string();
+                            if file_path.ends_with(".rs") {
+                                sections.push(Section {
+                                    file_name: file_path,
+                                    line_start: hunk.new_start(),
+                                    line_end: hunk.new_start() + hunk.new_lines(),
+                                });
+                            }
                         }
                     }
+                    _ => {}
                 }
-                _ => {}
-            }
-            true
-        }),
-        None,
-    )?;
-
-    Ok(sections)
+                true
+            }),
+            None,
+        )?;
+        Ok(sections)
+    }
 }
 
 #[cfg(test)]
@@ -64,8 +77,8 @@ mod tests {
     #[test]
     fn no_changes() -> Result<()> {
         let repo = RepoFixture::new()?;
-
-        let sections = get_sections(repo.path(), "master")?;
+        let git = Git::default();
+        let sections = git.sections(repo.path())?;
         assert!(sections.is_empty());
         Ok(())
     }
@@ -89,7 +102,9 @@ mod tests {
                 line_end: 7,
             },
         ];
-        let actual = get_sections(repo.path(), "master")?;
+
+        let git = Git::default();
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -112,7 +127,9 @@ mod tests {
                 line_end: 5,
             },
         ];
-        let actual = get_sections(repo.path(), "master")?;
+
+        let git = Git::default();
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -150,7 +167,9 @@ mod tests {
                 line_end: 7,
             },
         ];
-        let actual = get_sections(repo.path(), "master")?;
+
+        let git = Git::default();
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -167,7 +186,9 @@ mod tests {
             line_start: 1,
             line_end: 7,
         }];
-        let actual = get_sections(repo.path(), "master")?;
+
+        let git = Git::default();
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -193,7 +214,9 @@ mod tests {
                 line_end: 7,
             },
         ];
-        let actual = get_sections(repo.path(), "other")?;
+
+        let git = Git::with_target("other".to_string());
+        let actual = git.sections(repo.path())?;
         assert_eq!(expected, actual);
         Ok(())
     }

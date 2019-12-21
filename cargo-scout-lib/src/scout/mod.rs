@@ -1,53 +1,43 @@
-use crate::git::Section;
-use crate::linter::Lint;
-use crate::linter::Span;
+use crate::config::*;
+use crate::linter::*;
+use crate::vcs::*;
 
-pub struct Builder<C, L>
+pub struct Scout<V, C, L>
 where
-    C: crate::project::Config,
-    L: crate::linter::Linter,
+    V: VCS,
+    C: Config,
+    L: Linter,
 {
-    project: Option<C>,
-    linter: Option<L>,
-}
-
-pub struct Scout<C, L>
-where
-    C: crate::project::Config,
-    L: crate::linter::Linter,
-{
-    project: C,
+    vcs: V,
+    config: C,
     linter: L,
 }
 
-impl<C, L> Scout<C, L>
+impl<V, C, L> Scout<V, C, L>
 where
-    C: crate::project::Config,
-    L: crate::linter::Linter,
+    V: VCS,
+    C: Config,
+    L: Linter,
 {
-    pub fn run_for_diff(
-        &self,
-        diff_sections: &[Section],
-    ) -> Result<Vec<Lint>, crate::error::Error> {
+    pub fn new(vcs: V, config: C, linter: L) -> Self {
+        Self {
+            vcs,
+            config,
+            linter,
+        }
+    }
+    pub fn run(&self) -> Result<Vec<Lint>, crate::error::Error> {
+        let diff_sections = self.vcs.sections(".")?;
         let current_dir = std::fs::canonicalize(".")?;
         let mut lints = Vec::new();
-        if self.project.linter_must_iterate() {
-            let members = self.project.get_members();
-            // There's no need to run the linter on members where no changes have been made
-            let relevant_members = members.iter().filter(|m| diff_in_member(m, &diff_sections));
-            for m in relevant_members {
-                println!(
-                    "Running clippy on workspace member {:?}",
-                    current_dir.join(&m)
-                );
-                lints.extend(self.linter.get_lints(current_dir.join(m))?);
-            }
-        // There's no need to run the linter if no changes have been made
-        } else if !diff_sections.is_empty() {
-            lints.extend(self.linter.get_lints(current_dir)?);
+        let members = self.config.members();
+        // There's no need to run the linter on members where no changes have been made
+        let relevant_members = members.iter().filter(|m| diff_in_member(m, &diff_sections));
+        for m in relevant_members {
+            lints.extend(self.linter.lints(current_dir.join(m))?);
         }
-
-        Ok(get_lints_from_diff(&lints, &diff_sections))
+        println!("[Scout] - checking for intersections");
+        Ok(lints_from_diff(&lints, &diff_sections))
     }
 }
 
@@ -58,39 +48,6 @@ fn diff_in_member(member: &str, sections: &[Section]) -> bool {
         }
     }
     false
-}
-
-impl<C, L> Builder<C, L>
-where
-    C: crate::project::Config,
-    L: crate::linter::Linter,
-{
-    pub fn new() -> Self {
-        Self {
-            project: None,
-            linter: None,
-        }
-    }
-
-    pub fn set_project_config(&mut self, project: C) -> &mut Self {
-        self.project = Some(project);
-        self
-    }
-
-    pub fn set_linter(&mut self, linter: L) -> &mut Self {
-        self.linter = Some(linter);
-        self
-    }
-
-    pub fn build(self) -> Result<Scout<C, L>, crate::error::Error> {
-        match (self.project, self.linter) {
-            (Some(p), Some(l)) => Ok(Scout {
-                project: p,
-                linter: l,
-            }),
-            _ => Err(crate::error::Error::ScoutBuilder),
-        }
-    }
 }
 
 // Check if clippy_lint and git_section have overlapped lines
@@ -106,7 +63,7 @@ fn files_match(clippy_lint: &Span, git_section: &Section) -> bool {
     clippy_lint.file_name.replace("\\", "/") == git_section.file_name.replace("\\", "/")
 }
 
-pub fn get_lints_from_diff(lints: &[Lint], diffs: &[Section]) -> Vec<Lint> {
+fn lints_from_diff(lints: &[Lint], diffs: &[Section]) -> Vec<Lint> {
     let mut lints_in_diff = Vec::new();
     for diff in diffs {
         let diff_lints = lints.iter().filter(|lint| {
@@ -130,15 +87,34 @@ pub fn get_lints_from_diff(lints: &[Lint], diffs: &[Section]) -> Vec<Lint> {
 
 #[cfg(test)]
 mod scout_tests {
-    use crate::git::Section;
+    use super::*;
+    use crate::config::Config;
+    use crate::error::Error;
     use crate::linter::{Lint, Linter};
-    use crate::project::Config;
     use std::cell::RefCell;
-    use std::path::PathBuf;
+    use std::clone::Clone;
+    use std::path::{Path, PathBuf};
     use std::rc::Rc;
-
+    struct TestVCS {
+        sections: Vec<Section>,
+        sections_called: RefCell<bool>,
+    }
+    impl TestVCS {
+        pub fn new(sections: Vec<Section>) -> Self {
+            Self {
+                sections,
+                sections_called: RefCell::new(false),
+            }
+        }
+    }
+    impl VCS for TestVCS {
+        fn sections<P: AsRef<Path>>(&self, _: P) -> Result<Vec<Section>, Error> {
+            *self.sections_called.borrow_mut() = true;
+            Ok(self.sections.clone())
+        }
+    }
     struct TestLinter {
-        // Using a RefCell here because get_lints
+        // Using a RefCell here becauselints
         // takes &self and not &mut self.
         // We use usize here because we will compare it to a Vec::len()
         lints_times_called: Rc<RefCell<usize>>,
@@ -151,46 +127,38 @@ mod scout_tests {
         }
     }
     impl Linter for TestLinter {
-        fn get_lints(&self, _working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
+        fn lints(&self, _working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
             *self.lints_times_called.borrow_mut() += 1;
             Ok(Vec::new())
         }
     }
-
-    struct TestProject {
+    struct TestConfig {
         members: Vec<String>,
     }
-    impl TestProject {
+    impl TestConfig {
         pub fn new(members: Vec<String>) -> Self {
-            TestProject { members }
+            TestConfig { members }
         }
     }
-    impl Config for TestProject {
-        fn linter_must_iterate(&self) -> bool {
-            !self.get_members().is_empty()
-        }
-        fn get_members(&self) -> Vec<String> {
+    impl Config for TestConfig {
+        fn members(&self) -> Vec<String> {
             self.members.clone()
         }
     }
 
     #[test]
     fn test_scout_no_workspace_no_diff() -> Result<(), crate::error::Error> {
-        let diff = vec![];
-        use crate::scout::Builder;
         let linter = TestLinter::new();
+        let vcs = TestVCS::new(Vec::new());
         // No members so we won't have to iterate
-        let project = TestProject::new(Vec::new());
+        let config = TestConfig::new(Vec::new());
         let expected_times_called = 0;
         let actual_times_called = Rc::clone(&linter.lints_times_called);
-
-        let mut sb = Builder::new();
-        sb.set_linter(linter).set_project_config(project);
-        let scout = sb.build()?;
+        let scout = Scout::new(vcs, config, linter);
         // We don't check for the lints result here.
         // It is already tested in the linter tests
         // and in intersection tests
-        let _ = scout.run_for_diff(&diff)?;
+        let _ = scout.run()?;
         assert_eq!(expected_times_called, *actual_times_called.borrow());
         Ok(())
     }
@@ -202,20 +170,17 @@ mod scout_tests {
             line_start: 0,
             line_end: 10,
         }];
-        use crate::scout::Builder;
         let linter = TestLinter::new();
+        let vcs = TestVCS::new(diff);
         // The member matches the file name
-        let project = TestProject::new(vec!["foo".to_string()]);
+        let config = TestConfig::new(vec!["foo".to_string()]);
         let expected_times_called = 1;
         let actual_times_called = Rc::clone(&linter.lints_times_called);
-
-        let mut sb = Builder::new();
-        sb.set_linter(linter).set_project_config(project);
-        let scout = sb.build()?;
+        let scout = Scout::new(vcs, config, linter);
         // We don't check for the lints result here.
         // It is already tested in the linter tests
         // and in intersection tests
-        let _ = scout.run_for_diff(&diff)?;
+        let _ = scout.run()?;
         assert_eq!(expected_times_called, *actual_times_called.borrow());
         Ok(())
     }
@@ -227,20 +192,17 @@ mod scout_tests {
             line_start: 0,
             line_end: 10,
         }];
-        use crate::scout::Builder;
         let linter = TestLinter::new();
+        let vcs = TestVCS::new(diff);
         // The member does not match the file name
-        let project = TestProject::new(vec!["foo".to_string()]);
+        let config = TestConfig::new(vec!["foo".to_string()]);
         let expected_times_called = 0;
         let actual_times_called = Rc::clone(&linter.lints_times_called);
-
-        let mut sb = Builder::new();
-        sb.set_linter(linter).set_project_config(project);
-        let scout = sb.build()?;
+        let scout = Scout::new(vcs, config, linter);
         // We don't check for the lints result here.
         // It is already tested in the linter tests
         // and in intersection tests
-        let _ = scout.run_for_diff(&diff)?;
+        let _ = scout.run()?;
         assert_eq!(expected_times_called, *actual_times_called.borrow());
         Ok(())
     }
@@ -259,10 +221,10 @@ mod scout_tests {
                 line_end: 10,
             },
         ];
-        use crate::scout::Builder;
         let linter = TestLinter::new();
-        // The project has members, we will iterate
-        let project = TestProject::new(vec![
+        let vcs = TestVCS::new(diff);
+        // The config has members, we will iterate
+        let config = TestConfig::new(vec![
             "member1".to_string(),
             "member2".to_string(),
             "member3".to_string(),
@@ -270,14 +232,11 @@ mod scout_tests {
         // We should run the linter on member1 and member2
         let expected_times_called = 2;
         let actual_times_called = Rc::clone(&linter.lints_times_called);
-
-        let mut sb = Builder::new();
-        sb.set_linter(linter).set_project_config(project);
-        let scout = sb.build()?;
+        let scout = Scout::new(vcs, config, linter);
         // We don't check for the lints result here.
         // It is already tested in the linter tests
         // and in intersection tests
-        let _ = scout.run_for_diff(&diff)?;
+        let _ = scout.run()?;
 
         assert_eq!(expected_times_called, *actual_times_called.borrow());
         Ok(())
@@ -286,8 +245,8 @@ mod scout_tests {
 
 #[cfg(test)]
 mod intersections_tests {
-    use crate::git::Section;
     use crate::linter::Span;
+    use crate::vcs::Section;
 
     type TestSection = (&'static str, u32, u32);
     #[test]

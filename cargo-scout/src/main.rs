@@ -1,5 +1,10 @@
-use cargo_scout::{run, Error, Lint, ScoutOptions};
-pub use structopt::StructOpt;
+use cargo_scout_lib::config::rust::CargoConfig;
+use cargo_scout_lib::linter::clippy::Clippy;
+use cargo_scout_lib::linter::Lint;
+use cargo_scout_lib::scout::Scout;
+use cargo_scout_lib::vcs::git::Git;
+use cargo_scout_lib::Error;
+use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -37,23 +42,21 @@ struct Options {
     preview: bool,
 }
 
-impl From<Options> for ScoutOptions {
-    fn from(o: Options) -> Self {
-        Self {
-            verbose: o.verbose,
-            no_default_features: o.no_default_features,
-            all_features: o.all_features,
-            branch: o.branch,
-            cargo_toml: o.cargo_toml,
-            preview: o.preview,
-        }
-    }
-}
-
 fn main() -> Result<(), Error> {
     let opts = Options::from_args();
     let fail_if_errors = opts.without_error;
-    let relevant_lints = run(opts.into())?;
+
+    let vcs = Git::with_target(opts.branch);
+    let config = CargoConfig::from_manifest_path(opts.cargo_toml)?;
+    let mut linter = Clippy::default();
+    linter
+        .set_verbose(opts.verbose)
+        .set_no_default_features(opts.no_default_features)
+        .set_all_features(opts.all_features)
+        .set_preview(opts.preview);
+
+    let scout = Scout::new(vcs, config, linter);
+    let relevant_lints = scout.run()?;
     return_warnings(&relevant_lints, fail_if_errors)
 }
 

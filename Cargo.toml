@@ -1,26 +1,5 @@
-[package]
-name = "cargo-scout"
-version = "0.4.0"
-authors = ["o0Ignition0o <jeremy.lempereur@gmail.com>"]
-description = "Run clippy::pedantic on your diffs only"
-homepage = "https://github.com/o0Ignition0o/cargo-scout"
-repository = "https://github.com/o0Ignition0o/cargo-scout"
-keywords = ["clippy", "lint","pedantic", "cli", "diff"]
-license = "MIT/Apache-2.0"
-include = [
-    "**/*.rs",
-    "Cargo.toml",
+[workspace]
+members = [
+    "cargo-scout",
+    "cargo-scout-lib",
 ]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-serde = { version = "1.0.103", features = ["derive"] }
-serde_json = "1.0.44"
-structopt = "0.3.5"
-cargo_toml = "0.8.0"
-git2 = { version = "0.11.0", default-features = false }
-
-[dev-dependencies]
-tempfile = "3.1.0"

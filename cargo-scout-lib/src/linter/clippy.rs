@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::Command;
 
+#[derive(Default)]
 pub struct Clippy {
     verbose: bool,
     no_default_features: bool,
@@ -11,22 +12,17 @@ pub struct Clippy {
 }
 
 impl Linter for Clippy {
-    fn get_lints(&self, working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
+    fn lints(&self, working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
+        println!(
+            "[Clippy] - getting lints for directory {}",
+            &working_dir.to_str().unwrap_or("<no directory>")
+        );
         self.clippy(working_dir)
             .map(|clippy_output| lints(clippy_output.as_ref()))
     }
 }
 
 impl Clippy {
-    pub fn new() -> Self {
-        Self {
-            verbose: false,
-            no_default_features: false,
-            all_features: false,
-            preview: false,
-        }
-    }
-
     pub fn set_verbose(&mut self, verbose: bool) -> &mut Self {
         self.verbose = verbose;
         self
@@ -47,7 +43,7 @@ impl Clippy {
         self
     }
 
-    fn get_command_parameters(&self) -> Vec<&str> {
+    fn command_parameters(&self) -> Vec<&str> {
         let mut params = if self.preview {
             vec![
                 "+nightly",
@@ -73,7 +69,7 @@ impl Clippy {
         params
     }
 
-    fn get_envs(&self) -> Vec<(&str, &str)> {
+    fn envs(&self) -> Vec<(&str, &str)> {
         let mut envs = vec![];
         if self.verbose {
             envs.push(("RUST_BACKTRACE", "full"));
@@ -84,8 +80,8 @@ impl Clippy {
     fn clippy(&self, path: impl AsRef<std::path::Path>) -> Result<String, crate::error::Error> {
         let clippy_pedantic_output = Command::new("cargo")
             .current_dir(path)
-            .args(self.get_command_parameters())
-            .envs(self.get_envs())
+            .args(self.command_parameters())
+            .envs(self.envs())
             .output()
             .expect("failed to run clippy pedantic");
 
@@ -102,12 +98,12 @@ impl Clippy {
             println!("cleaning and building with full backtrace");
             let _ = Command::new("cargo")
                 .args(&["clean"])
-                .envs(self.get_envs())
+                .envs(self.envs())
                 .output()
                 .expect("failed to start cargo clean");
             let build = Command::new("cargo")
                 .args(&["build"])
-                .envs(self.get_envs())
+                .envs(self.envs())
                 .output()
                 .expect("failed to start cargo build");
             if build.status.success() {
@@ -121,8 +117,8 @@ impl Clippy {
         }
     }
 }
-
-pub fn lints(clippy_output: &str) -> Vec<Lint> {
+#[must_use]
+fn lints(clippy_output: &str) -> Vec<Lint> {
     clippy_output
         .lines()
         .filter(|l| l.starts_with('{'))
@@ -142,7 +138,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_set_verbose() {
-        let mut linter = Clippy::new();
+        let mut linter = Clippy::default();
         assert_eq!(false, linter.verbose);
 
         let l2 = linter.set_verbose(true);
@@ -153,17 +149,17 @@ mod tests {
     }
     #[test]
     fn test_get_envs() {
-        let mut linter = Clippy::new();
+        let mut linter = Clippy::default();
         let mut expected_envs = vec![];
-        assert_eq!(expected_envs, linter.get_envs());
+        assert_eq!(expected_envs, linter.envs());
 
         let verbose_linter = linter.set_verbose(true);
         expected_envs.push(("RUST_BACKTRACE", "full"));
-        assert_eq!(expected_envs, verbose_linter.get_envs());
+        assert_eq!(expected_envs, verbose_linter.envs());
     }
     #[test]
     fn test_get_command_parameters() {
-        let mut linter = Clippy::new();
+        let mut linter = Clippy::default();
         let expected_command_parameters = vec![
             "clippy",
             "--message-format",
@@ -173,7 +169,7 @@ mod tests {
             "clippy::pedantic",
         ];
 
-        assert_eq!(expected_command_parameters, linter.get_command_parameters());
+        assert_eq!(expected_command_parameters, linter.command_parameters());
 
         let verbose_linter = linter.set_verbose(true);
         let verbose_expected_command_parameters = vec![
@@ -187,7 +183,7 @@ mod tests {
         ];
         assert_eq!(
             verbose_expected_command_parameters,
-            verbose_linter.get_command_parameters()
+            verbose_linter.command_parameters()
         );
 
         let no_default_features_linter = linter.set_verbose(false).set_no_default_features(true);
@@ -202,7 +198,7 @@ mod tests {
         ];
         assert_eq!(
             no_default_features_command_parameters,
-            no_default_features_linter.get_command_parameters()
+            no_default_features_linter.command_parameters()
         );
 
         let all_features_linter = linter
@@ -220,10 +216,10 @@ mod tests {
         ];
         assert_eq!(
             all_features_command_parameters,
-            all_features_linter.get_command_parameters()
+            all_features_linter.command_parameters()
         );
 
-        let mut nightly_linter = Clippy::new();
+        let mut nightly_linter = Clippy::default();
         let nightly_linter = nightly_linter.set_preview(true);
         let expected_command_parameters = vec![
             "+nightly",
@@ -238,7 +234,7 @@ mod tests {
         ];
         assert_eq!(
             expected_command_parameters,
-            nightly_linter.get_command_parameters()
+            nightly_linter.command_parameters()
         );
 
         let nightly_verbose_linter = nightly_linter.set_verbose(true);
@@ -256,7 +252,7 @@ mod tests {
         ];
         assert_eq!(
             verbose_expected_command_nightly_parameters,
-            nightly_verbose_linter.get_command_parameters()
+            nightly_verbose_linter.command_parameters()
         );
 
         let nightly_all_features_linter = nightly_linter.set_verbose(false).set_all_features(true);
@@ -274,7 +270,7 @@ mod tests {
         ];
         assert_eq!(
             all_features_command_nightly_parameters,
-            nightly_all_features_linter.get_command_parameters()
+            nightly_all_features_linter.command_parameters()
         );
 
         let nightly_no_default_features_linter = nightly_linter
@@ -295,7 +291,7 @@ mod tests {
         ];
         assert_eq!(
             no_default_features_command_nightly_parameters,
-            nightly_no_default_features_linter.get_command_parameters()
+            nightly_no_default_features_linter.command_parameters()
         );
     }
     #[test]
