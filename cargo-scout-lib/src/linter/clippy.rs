@@ -228,7 +228,9 @@ mod tests {
             all_features_linter.command_parameters()
         );
 
-        let features_linter = linter.set_all_features(false).set_features(Some(String::from("foo bar baz")));
+        let features_linter = linter
+            .set_all_features(false)
+            .set_features(Some(String::from("foo bar baz")));
         let features_expected_command_parameters = vec![
             "clippy",
             "--message-format",
@@ -243,7 +245,6 @@ mod tests {
             features_expected_command_parameters,
             features_linter.command_parameters()
         );
-
 
         let mut nightly_linter = Clippy::default();
         let nightly_linter = nightly_linter.set_preview(true);
