@@ -8,6 +8,7 @@ pub struct Clippy {
     verbose: bool,
     no_default_features: bool,
     all_features: bool,
+    features: Option<String>,
     preview: bool,
 }
 
@@ -38,6 +39,11 @@ impl Clippy {
         self
     }
 
+    pub fn set_features(&mut self, features: Option<String>) -> &mut Self {
+        self.features = features;
+        self
+    }
+
     pub fn set_preview(&mut self, preview: bool) -> &mut Self {
         self.preview = preview;
         self
@@ -64,6 +70,9 @@ impl Clippy {
         }
         if self.all_features {
             params.push("--all-features");
+        }
+        if let Some(features) = &self.features {
+            params.append(&mut vec!["--features", features]);
         }
         params.append(&mut vec!["--", "-W", "clippy::pedantic"]);
         params
@@ -187,7 +196,7 @@ mod tests {
         );
 
         let no_default_features_linter = linter.set_verbose(false).set_no_default_features(true);
-        let no_default_features_command_parameters = vec![
+        let no_default_features_expected_command_parameters = vec![
             "clippy",
             "--message-format",
             "json",
@@ -197,7 +206,7 @@ mod tests {
             "clippy::pedantic",
         ];
         assert_eq!(
-            no_default_features_command_parameters,
+            no_default_features_expected_command_parameters,
             no_default_features_linter.command_parameters()
         );
 
@@ -205,7 +214,7 @@ mod tests {
             .set_verbose(false)
             .set_no_default_features(false)
             .set_all_features(true);
-        let all_features_command_parameters = vec![
+        let all_features_expected_command_parameters = vec![
             "clippy",
             "--message-format",
             "json",
@@ -215,8 +224,26 @@ mod tests {
             "clippy::pedantic",
         ];
         assert_eq!(
-            all_features_command_parameters,
+            all_features_expected_command_parameters,
             all_features_linter.command_parameters()
+        );
+
+        let features_linter = linter
+            .set_all_features(false)
+            .set_features(Some(String::from("foo bar baz")));
+        let features_expected_command_parameters = vec![
+            "clippy",
+            "--message-format",
+            "json",
+            "--features",
+            "foo bar baz",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            features_expected_command_parameters,
+            features_linter.command_parameters()
         );
 
         let mut nightly_linter = Clippy::default();
@@ -256,7 +283,7 @@ mod tests {
         );
 
         let nightly_all_features_linter = nightly_linter.set_verbose(false).set_all_features(true);
-        let all_features_command_nightly_parameters = vec![
+        let all_features_expected_command_nightly_parameters = vec![
             "+nightly",
             "clippy-preview",
             "-Z",
@@ -269,7 +296,7 @@ mod tests {
             "clippy::pedantic",
         ];
         assert_eq!(
-            all_features_command_nightly_parameters,
+            all_features_expected_command_nightly_parameters,
             nightly_all_features_linter.command_parameters()
         );
 
@@ -277,7 +304,7 @@ mod tests {
             .set_verbose(false)
             .set_all_features(false)
             .set_no_default_features(true);
-        let no_default_features_command_nightly_parameters = vec![
+        let no_default_features_expected_command_nightly_parameters = vec![
             "+nightly",
             "clippy-preview",
             "-Z",
@@ -290,8 +317,29 @@ mod tests {
             "clippy::pedantic",
         ];
         assert_eq!(
-            no_default_features_command_nightly_parameters,
+            no_default_features_expected_command_nightly_parameters,
             nightly_no_default_features_linter.command_parameters()
+        );
+
+        let nightly_features_linter = nightly_linter
+            .set_no_default_features(false)
+            .set_features(Some(String::from("foo bar baz")));
+        let features_expected_command_nightly_parameters = vec![
+            "+nightly",
+            "clippy-preview",
+            "-Z",
+            "unstable-options",
+            "--message-format",
+            "json",
+            "--features",
+            "foo bar baz",
+            "--",
+            "-W",
+            "clippy::pedantic",
+        ];
+        assert_eq!(
+            features_expected_command_nightly_parameters,
+            nightly_features_linter.command_parameters()
         );
     }
     #[test]

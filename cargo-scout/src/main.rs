@@ -22,6 +22,9 @@ struct Options {
     #[structopt(long = "all-features")]
     /// Pass the all features flag to clippy
     all_features: bool,
+    #[structopt(long = "features")]
+    /// Pass features to clippy
+    features: Option<String>,
     #[structopt(
         short = "b",
         long = "branch",
@@ -53,6 +56,7 @@ fn main() -> Result<(), Error> {
         .set_verbose(opts.verbose)
         .set_no_default_features(opts.no_default_features)
         .set_all_features(opts.all_features)
+        .set_features(opts.features)
         .set_preview(opts.preview);
 
     let scout = Scout::new(vcs, config, linter);
