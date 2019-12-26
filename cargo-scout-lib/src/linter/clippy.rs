@@ -1,5 +1,6 @@
 use crate::linter::{Lint, Linter};
 use std::io::{self, Write};
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -86,7 +87,7 @@ impl Clippy {
         envs
     }
 
-    fn clippy(&self, path: impl AsRef<std::path::Path>) -> Result<String, crate::error::Error> {
+    fn clippy(&self, path: impl AsRef<Path>) -> Result<String, crate::error::Error> {
         let clippy_pedantic_output = Command::new("cargo")
             .current_dir(path)
             .args(self.command_parameters())

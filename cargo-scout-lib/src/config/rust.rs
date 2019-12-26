@@ -1,4 +1,5 @@
 use crate::config::Config;
+use std::path::Path;
 
 /// This struct represents a Cargo project configuration.
 pub struct CargoConfig {
@@ -39,7 +40,7 @@ impl CargoConfig {
     /// assert_eq!(vec!["cargo-scout".to_string(), "cargo-scout-lib".to_string()], config.members());
     /// # Ok::<(), cargo_scout_lib::Error>(())
     /// ```
-    pub fn from_manifest_path(p: impl AsRef<std::path::Path>) -> Result<Self, crate::error::Error> {
+    pub fn from_manifest_path(p: impl AsRef<Path>) -> Result<Self, crate::error::Error> {
         Ok(Self::from_manifest(cargo_toml::Manifest::from_path(p)?))
     }
 
