@@ -8,7 +8,8 @@ matrix:
 env:
   - RUST_BACKTRACE=1
 before_script:
-  - rustup component add clippy
+  - rustup component add rustfmt clippy 
 script:
+  - cargo fmt -- --check
   - cargo clippy -- -D clippy::pedantic
   - cargo test --all
