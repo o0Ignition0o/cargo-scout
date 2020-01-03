@@ -117,13 +117,19 @@ impl Clippy {
                 .output()
                 .expect("failed to start cargo build");
             if build.status.success() {
-                Err(String::from_utf8(build.stdout)?.into())
+                Err(crate::error::Error::Command(String::from_utf8(
+                    build.stdout,
+                )?))
             } else {
                 io::stdout().write_all(&build.stdout)?;
-                Err(String::from_utf8(build.stderr)?.into())
+                Err(crate::error::Error::Command(String::from_utf8(
+                    build.stderr,
+                )?))
             }
         } else {
-            Err(String::from_utf8(clippy_pedantic_output.stderr)?.into())
+            Err(crate::error::Error::Command(String::from_utf8(
+                clippy_pedantic_output.stderr,
+            )?))
         }
     }
 }
