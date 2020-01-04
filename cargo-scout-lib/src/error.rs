@@ -1,53 +1,21 @@
-#[derive(Debug)]
+use thiserror::Error;
+
+#[derive(Error, Debug)]
 pub enum Error {
+    #[error("ScoutBuilder error")]
     ScoutBuilder,
-    CargoToml(cargo_toml::Error),
+    #[error("CargoToml error: {0}")]
+    CargoToml(#[from] cargo_toml::Error),
+    #[error("Command error: {0}")]
     Command(String),
-    Utf8(std::string::FromUtf8Error),
-    Json(serde_json::Error),
+    #[error("Utf8 error: {0}")]
+    Utf8(#[from] std::string::FromUtf8Error),
+    #[error("Json error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("NotClean error")]
     NotClean,
-    Io(std::io::Error),
-    Git(git2::Error),
-}
-
-impl From<std::string::FromUtf8Error> for Error {
-    #[must_use]
-    fn from(err: std::string::FromUtf8Error) -> Self {
-        Self::Utf8(err)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    #[must_use]
-    fn from(err: serde_json::Error) -> Self {
-        Self::Json(err)
-    }
-}
-
-impl From<String> for Error {
-    #[must_use]
-    fn from(err: String) -> Self {
-        Self::Command(err)
-    }
-}
-
-impl From<std::io::Error> for Error {
-    #[must_use]
-    fn from(err: std::io::Error) -> Self {
-        Self::Io(err)
-    }
-}
-
-impl From<cargo_toml::Error> for Error {
-    #[must_use]
-    fn from(err: cargo_toml::Error) -> Self {
-        Self::CargoToml(err)
-    }
-}
-
-impl From<git2::Error> for Error {
-    #[must_use]
-    fn from(err: git2::Error) -> Self {
-        Self::Git(err)
-    }
+    #[error("Io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Git error: {0}")]
+    Git(#[from] git2::Error),
 }
