@@ -1,7 +1,8 @@
-use crate::linter::{Lint, Linter};
+use crate::linter;
+use crate::utils::get_absolute_file_path;
+use serde::Deserialize;
 use std::io::{self, Write};
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Default)]
@@ -13,8 +14,44 @@ pub struct Clippy {
     preview: bool,
 }
 
-impl Linter for Clippy {
-    fn lints(&self, working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
+#[derive(Deserialize, Clone)]
+/// A `Linter`s output is a `Vec<Lint>`
+struct Lint {
+    /// The package id
+    /// Example:
+    /// "cargo-scout-lib".to_string()
+    package_id: String,
+    /// The file the lint was reported on
+    /// Example:
+    /// Some("src/lib.rs".to_string())
+    src_path: Option<String>,
+    /// The message structure
+    message: Option<Message>,
+}
+
+#[derive(Deserialize, Clone)]
+/// This struct contains the message output,
+/// and a `Vec<Span>` with the message location
+struct Message {
+    /// The message string
+    /// Example:
+    /// unused variable `count`
+    rendered: String,
+    /// The file names and lines the lint
+    /// was reported on
+    spans: Vec<Span>,
+}
+
+#[derive(Deserialize, Clone)]
+/// A `Span` has a file name, a start and an end line
+struct Span {
+    file_name: String,
+    line_start: u32,
+    line_end: u32,
+}
+
+impl linter::Linter for Clippy {
+    fn lints(&self, working_dir: PathBuf) -> Result<Vec<linter::Lint>, crate::error::Error> {
         println!(
             "[Clippy] - getting lints for directory {}",
             &working_dir.to_str().unwrap_or("<no directory>")
@@ -75,7 +112,14 @@ impl Clippy {
         if let Some(features) = &self.features {
             params.append(&mut vec!["--features", features]);
         }
-        params.append(&mut vec!["--", "-W", "clippy::pedantic"]);
+        params.append(&mut vec![
+            "--tests",
+            "--",
+            "-W",
+            "clippy::all",
+            "-W",
+            "clippy::pedantic",
+        ]);
         params
     }
 
@@ -87,6 +131,10 @@ impl Clippy {
         envs
     }
 
+    // Skipped from code coverage
+    // because an external command
+    // cannot be easily unit tested
+    #[cfg_attr(tarpaulin, skip)]
     fn clippy(&self, path: impl AsRef<Path>) -> Result<String, crate::error::Error> {
         let clippy_pedantic_output = Command::new("cargo")
             .current_dir(path)
@@ -134,24 +182,42 @@ impl Clippy {
     }
 }
 #[must_use]
-fn lints(clippy_output: &str) -> Vec<Lint> {
-    clippy_output
+fn lints(clippy_output: &str) -> Vec<linter::Lint> {
+    let mut lints = Vec::new();
+
+    let clippy_messages: Vec<Message> = clippy_output
         .lines()
         .filter(|l| l.starts_with('{'))
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .filter(|lint: &Lint| {
-            if let Some(m) = &lint.message {
-                !m.spans.is_empty()
+        .filter_map(|line| {
+            if let Ok(lint) = serde_json::from_str::<Lint>(line) {
+                lint.message
             } else {
-                false
+                None
             }
         })
-        .collect::<Vec<Lint>>()
+        .filter(|message: &Message| !message.spans.is_empty())
+        .collect();
+
+    for c in clippy_messages {
+        for s in c.spans {
+            if let Ok(path) = get_absolute_file_path(s.file_name) {
+                lints.push(linter::Lint {
+                    message: c.rendered.clone(),
+                    location: linter::Location {
+                        path,
+                        lines: [s.line_start, s.line_end],
+                    },
+                })
+            }
+        }
+    }
+    lints
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::Error;
     #[test]
     fn test_set_verbose() {
         let mut linter = Clippy::default();
@@ -180,7 +246,10 @@ mod tests {
             "clippy",
             "--message-format",
             "json",
+            "--tests",
             "--",
+            "-W",
+            "clippy::all",
             "-W",
             "clippy::pedantic",
         ];
@@ -188,185 +257,81 @@ mod tests {
         assert_eq!(expected_command_parameters, linter.command_parameters());
 
         let verbose_linter = linter.set_verbose(true);
-        let verbose_expected_command_parameters = vec![
-            "clippy",
-            "--message-format",
-            "json",
-            "--verbose",
-            "--",
-            "-W",
-            "clippy::pedantic",
-        ];
-        assert_eq!(
-            verbose_expected_command_parameters,
-            verbose_linter.command_parameters()
-        );
+        assert!(verbose_linter.command_parameters().contains(&"--verbose"));
 
         let no_default_features_linter = linter.set_verbose(false).set_no_default_features(true);
-        let no_default_features_expected_command_parameters = vec![
-            "clippy",
-            "--message-format",
-            "json",
-            "--no-default-features",
-            "--",
-            "-W",
-            "clippy::pedantic",
-        ];
-        assert_eq!(
-            no_default_features_expected_command_parameters,
-            no_default_features_linter.command_parameters()
-        );
+        assert!(no_default_features_linter
+            .command_parameters()
+            .contains(&"--no-default-features"));
 
         let all_features_linter = linter
             .set_verbose(false)
             .set_no_default_features(false)
             .set_all_features(true);
-        let all_features_expected_command_parameters = vec![
-            "clippy",
-            "--message-format",
-            "json",
-            "--all-features",
-            "--",
-            "-W",
-            "clippy::pedantic",
-        ];
-        assert_eq!(
-            all_features_expected_command_parameters,
-            all_features_linter.command_parameters()
-        );
+        assert!(all_features_linter
+            .command_parameters()
+            .contains(&"--all-features"));
 
         let features_linter = linter
             .set_all_features(false)
             .set_features(Some(String::from("foo bar baz")));
-        let features_expected_command_parameters = vec![
-            "clippy",
-            "--message-format",
-            "json",
-            "--features",
-            "foo bar baz",
-            "--",
-            "-W",
-            "clippy::pedantic",
-        ];
-        assert_eq!(
-            features_expected_command_parameters,
-            features_linter.command_parameters()
-        );
 
+        assert!(features_linter.command_parameters().contains(&"--features"));
+        assert!(features_linter
+            .command_parameters()
+            .contains(&"foo bar baz"));
+    }
+
+    #[test]
+    fn test_get_command_parameters_nightly() {
         let mut nightly_linter = Clippy::default();
         let nightly_linter = nightly_linter.set_preview(true);
-        let expected_command_parameters = vec![
-            "+nightly",
-            "clippy-preview",
-            "-Z",
-            "unstable-options",
-            "--message-format",
-            "json",
-            "--",
-            "-W",
-            "clippy::pedantic",
-        ];
-        assert_eq!(
-            expected_command_parameters,
-            nightly_linter.command_parameters()
-        );
+        assert!(nightly_linter
+            .command_parameters()
+            .contains(&"clippy-preview"));
 
         let nightly_verbose_linter = nightly_linter.set_verbose(true);
-        let verbose_expected_command_nightly_parameters = vec![
-            "+nightly",
-            "clippy-preview",
-            "-Z",
-            "unstable-options",
-            "--message-format",
-            "json",
-            "--verbose",
-            "--",
-            "-W",
-            "clippy::pedantic",
-        ];
-        assert_eq!(
-            verbose_expected_command_nightly_parameters,
-            nightly_verbose_linter.command_parameters()
-        );
+        assert!(nightly_verbose_linter
+            .command_parameters()
+            .contains(&"--verbose"));
 
         let nightly_all_features_linter = nightly_linter.set_verbose(false).set_all_features(true);
-        let all_features_expected_command_nightly_parameters = vec![
-            "+nightly",
-            "clippy-preview",
-            "-Z",
-            "unstable-options",
-            "--message-format",
-            "json",
-            "--all-features",
-            "--",
-            "-W",
-            "clippy::pedantic",
-        ];
-        assert_eq!(
-            all_features_expected_command_nightly_parameters,
-            nightly_all_features_linter.command_parameters()
-        );
+        assert!(nightly_all_features_linter
+            .command_parameters()
+            .contains(&"--all-features"));
 
         let nightly_no_default_features_linter = nightly_linter
             .set_verbose(false)
             .set_all_features(false)
             .set_no_default_features(true);
-        let no_default_features_expected_command_nightly_parameters = vec![
-            "+nightly",
-            "clippy-preview",
-            "-Z",
-            "unstable-options",
-            "--message-format",
-            "json",
-            "--no-default-features",
-            "--",
-            "-W",
-            "clippy::pedantic",
-        ];
-        assert_eq!(
-            no_default_features_expected_command_nightly_parameters,
-            nightly_no_default_features_linter.command_parameters()
-        );
+        assert!(nightly_no_default_features_linter
+            .command_parameters()
+            .contains(&"--no-default-features"));
 
         let nightly_features_linter = nightly_linter
             .set_no_default_features(false)
             .set_features(Some(String::from("foo bar baz")));
-        let features_expected_command_nightly_parameters = vec![
-            "+nightly",
-            "clippy-preview",
-            "-Z",
-            "unstable-options",
-            "--message-format",
-            "json",
-            "--features",
-            "foo bar baz",
-            "--",
-            "-W",
-            "clippy::pedantic",
-        ];
-        assert_eq!(
-            features_expected_command_nightly_parameters,
-            nightly_features_linter.command_parameters()
-        );
+        assert!(nightly_features_linter
+            .command_parameters()
+            .contains(&"--features"));
+        assert!(nightly_features_linter
+            .command_parameters()
+            .contains(&"foo bar baz"));
     }
     #[test]
-    fn test_lints() {
-        use crate::linter::{Message, Span};
-        let expected_lints = vec![Lint {
-            package_id: "cargo-scout".to_string(),
-            src_path: Some("test/foo/bar.rs".to_string()),
-            message: Some(Message {
-                rendered: "this is a test lint".to_string(),
-                spans: vec![Span {
-                    file_name: "test/foo/baz.rs".to_string(),
-                    line_start: 10,
-                    line_end: 12,
-                }],
-            }),
+    fn test_lints() -> Result<(), Error> {
+        use crate::linter;
+        let expected_lints = vec![linter::Lint {
+            message: "this is a test lint".to_string(),
+            location: linter::Location {
+                path: get_absolute_file_path("test/foo/baz.rs")?,
+                lines: [10, 12],
+            },
         }];
 
         let clippy_output = r#"{"package_id": "cargo-scout","src_path": "test/foo/bar.rs","message": { "rendered": "this is a test lint","spans": [{"file_name": "test/foo/baz.rs","line_start": 10,"line_end": 12}]}}"#;
 
         assert_eq!(expected_lints, lints(clippy_output));
+        Ok(())
     }
 }
