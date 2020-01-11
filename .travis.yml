@@ -1,31 +1,35 @@
+os: linux
 language: rust
 rust:
   - stable
   - nightly
-sudo: required
-matrix:
+jobs:
   allow_failures:
     - rust: nightly
 env:
-  - RUST_BACKTRACE=1
+  - RUST_BACKTRACE=full
 addons:
   apt:
     packages:
       - libssl-dev
+cache: cargo
 before_script:
   - |
     if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
-      cargo install cargo-tarpaulin -f
+      cargo install cargo-tarpaulin  
       rustup component add clippy
+      rustup component add rustfmt
+    else
+      rustup component add clippy --toolchain=nightly || cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy
+      rustup component add rustfmt --toolchain nightly || cargo install --git https://github.com/rust-lang/rustfmt/ --force fmt
     fi
-  - rustup component add rustfmt
 script:
   - cargo fmt -- --check
-  - |
+  - cargo test --all
+  - cargo clippy --all-targets --tests -- -D clippy::pedantic
+after_success: |
     if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
-      cargo clippy -- -D clippy::pedantic
       USE_SKEPTIC=1 cargo tarpaulin --out Xml
       bash <(curl -s https://codecov.io/bash)
       echo "Uploaded code coverage"
     fi
-  - cargo test --all
