@@ -51,7 +51,11 @@ struct Span {
 }
 
 impl linter::Linter for Clippy {
-    fn lints(&self, working_dir: PathBuf) -> Result<Vec<linter::Lint>, crate::error::Error> {
+    fn lints(
+        &self,
+        working_dir: impl Into<PathBuf>,
+    ) -> Result<Vec<linter::Lint>, crate::error::Error> {
+        let working_dir = working_dir.into();
         println!(
             "[Clippy] - getting lints for directory {}",
             &working_dir.to_str().unwrap_or("<no directory>")

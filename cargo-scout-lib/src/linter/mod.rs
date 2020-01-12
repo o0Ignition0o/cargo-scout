@@ -4,7 +4,7 @@ pub mod clippy;
 pub mod rustfmt;
 
 pub trait Linter {
-    fn lints(&self, working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error>;
+    fn lints(&self, working_dir: impl Into<PathBuf>) -> Result<Vec<Lint>, crate::error::Error>;
 }
 
 /// This struct contains the lint,

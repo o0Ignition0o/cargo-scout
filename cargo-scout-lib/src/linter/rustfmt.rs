@@ -10,7 +10,8 @@ use std::process::Command;
 pub struct RustFmt {}
 
 impl Linter for RustFmt {
-    fn lints(&self, working_dir: PathBuf) -> Result<Vec<Lint>, Error> {
+    fn lints(&self, working_dir: impl Into<PathBuf>) -> Result<Vec<Lint>, Error> {
+        let working_dir = working_dir.into();
         println!(
             "[RustFmt] - checking format for directory {}",
             &working_dir.to_str().unwrap_or("<no directory>")
