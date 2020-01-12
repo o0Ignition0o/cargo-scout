@@ -1,6 +1,7 @@
 use crate::config::*;
-use crate::linter::*;
+use crate::linter::{Lint, Linter};
 use crate::vcs::*;
+use std::path::PathBuf;
 
 pub struct Scout<V, C, L>
 where
@@ -27,57 +28,55 @@ where
         }
     }
     pub fn run(&self) -> Result<Vec<Lint>, crate::error::Error> {
-        let diff_sections = self.vcs.sections(".")?;
-        let current_dir = std::fs::canonicalize(".")?;
+        let current_dir = std::fs::canonicalize(std::env::current_dir()?)?;
+        let diff_sections = self.vcs.sections(current_dir.clone())?;
         let mut lints = Vec::new();
-        let members = self.config.members();
+        let config_members = self.config.members();
+        let members = config_members.iter().map(|m| {
+            let mut member = current_dir.clone();
+            member.push(m);
+            member
+        });
         // There's no need to run the linter on members where no changes have been made
-        let relevant_members = members.iter().filter(|m| diff_in_member(m, &diff_sections));
+        let relevant_members = members.filter(|m| diff_in_member(m, &diff_sections));
         for m in relevant_members {
-            lints.extend(self.linter.lints(current_dir.join(m))?);
+            lints.extend(self.linter.lints(current_dir.clone().join(m))?);
         }
         println!("[Scout] - checking for intersections");
         Ok(lints_from_diff(&lints, &diff_sections))
     }
 }
 
-fn diff_in_member(member: &str, sections: &[Section]) -> bool {
-    for s in sections {
-        if s.file_name.starts_with(&member) {
-            return true;
+fn diff_in_member(member: &PathBuf, sections: &[Section]) -> bool {
+    if let Some(m) = member.to_str() {
+        for s in sections {
+            if s.file_name.starts_with(&m) {
+                return true;
+            }
         }
     }
     false
 }
 
-// Check if clippy_lint and git_section have overlapped lines
-fn lines_in_range(clippy_lint: &Span, git_section: &Section) -> bool {
-    // If git_section.line_start is included in the clippy_lint span
-    clippy_lint.line_start <= git_section.line_start && git_section.line_start <= clippy_lint.line_end ||
-    // If clippy_lint.line_start is included in the git_section span
-    git_section.line_start <= clippy_lint.line_start && clippy_lint.line_start <= git_section.line_end
+// Check if lint and git_section have overlapped lines
+fn lines_in_range(lint: &Lint, git_section: &Section) -> bool {
+    // If git_section.line_start is included in the lint span
+    lint.location.lines[0] <= git_section.line_start && git_section.line_start <= lint.location.lines[1] ||
+    // If lint.line_start is included in the git_section span
+    git_section.line_start <= lint.location.lines[0] && lint.location.lines[0] <= git_section.line_end
 }
 
-fn files_match(clippy_lint: &Span, git_section: &Section) -> bool {
+fn files_match(lint: &Lint, git_section: &Section) -> bool {
     // Git diff paths and clippy paths don't get along too well on Windows...
-    clippy_lint.file_name.replace("\\", "/") == git_section.file_name.replace("\\", "/")
+    lint.location.path.replace("\\", "/") == git_section.file_name.replace("\\", "/")
 }
 
 fn lints_from_diff(lints: &[Lint], diffs: &[Section]) -> Vec<Lint> {
     let mut lints_in_diff = Vec::new();
     for diff in diffs {
-        let diff_lints = lints.iter().filter(|lint| {
-            if let Some(m) = &lint.message {
-                for s in &m.spans {
-                    if files_match(&s, &diff) && lines_in_range(&s, &diff) {
-                        return true;
-                    };
-                }
-                false
-            } else {
-                false
-            }
-        });
+        let diff_lints = lints
+            .iter()
+            .filter(|lint| files_match(&lint, &diff) && lines_in_range(&lint, &diff));
         for l in diff_lints {
             lints_in_diff.push(l.clone());
         }
@@ -90,7 +89,8 @@ mod scout_tests {
     use super::*;
     use crate::config::Config;
     use crate::error::Error;
-    use crate::linter::{Lint, Linter};
+    use crate::linter::{Lint, Linter, Location};
+    use crate::utils::get_absolute_file_path;
     use std::cell::RefCell;
     use std::clone::Clone;
     use std::path::{Path, PathBuf};
@@ -114,22 +114,31 @@ mod scout_tests {
         }
     }
     struct TestLinter {
-        // Using a RefCell here becauselints
+        // Using a RefCell here because lints
         // takes &self and not &mut self.
         // We use usize here because we will compare it to a Vec::len()
         lints_times_called: Rc<RefCell<usize>>,
+        lints: Vec<Lint>,
     }
     impl TestLinter {
         pub fn new() -> Self {
             Self {
                 lints_times_called: Rc::new(RefCell::new(0)),
+                lints: Vec::new(),
+            }
+        }
+
+        pub fn with_lints(lints: Vec<Lint>) -> Self {
+            Self {
+                lints_times_called: Rc::new(RefCell::new(0)),
+                lints,
             }
         }
     }
     impl Linter for TestLinter {
         fn lints(&self, _working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
             *self.lints_times_called.borrow_mut() += 1;
-            Ok(Vec::new())
+            Ok(self.lints.clone())
         }
     }
     struct TestConfig {
@@ -137,7 +146,7 @@ mod scout_tests {
     }
     impl TestConfig {
         pub fn new(members: Vec<String>) -> Self {
-            TestConfig { members }
+            Self { members }
         }
     }
     impl Config for TestConfig {
@@ -166,11 +175,37 @@ mod scout_tests {
     #[test]
     fn test_scout_no_workspace_one_diff() -> Result<(), crate::error::Error> {
         let diff = vec![Section {
-            file_name: "foo/bar.rs".to_string(),
+            file_name: get_absolute_file_path("foo/bar.rs")?,
             line_start: 0,
             line_end: 10,
         }];
-        let linter = TestLinter::new();
+
+        let lints = vec![
+            Lint {
+                location: Location {
+                    lines: [2, 2],
+                    path: get_absolute_file_path("foo/bar.rs")?,
+                },
+                message: "Test lint".to_string(),
+            },
+            Lint {
+                location: Location {
+                    lines: [12, 22],
+                    path: get_absolute_file_path("foo/bar.rs")?,
+                },
+                message: "This lint is not in diff".to_string(),
+            },
+        ];
+
+        let expected_lints_from_diff = vec![Lint {
+            location: Location {
+                lines: [2, 2],
+                path: get_absolute_file_path("foo/bar.rs")?,
+            },
+            message: "Test lint".to_string(),
+        }];
+
+        let linter = TestLinter::with_lints(lints);
         let vcs = TestVCS::new(diff);
         // The member matches the file name
         let config = TestConfig::new(vec!["foo".to_string()]);
@@ -180,15 +215,16 @@ mod scout_tests {
         // We don't check for the lints result here.
         // It is already tested in the linter tests
         // and in intersection tests
-        let _ = scout.run()?;
+        let actual_lints_from_diff = scout.run()?;
         assert_eq!(expected_times_called, *actual_times_called.borrow());
+        assert_eq!(expected_lints_from_diff, actual_lints_from_diff);
         Ok(())
     }
 
     #[test]
     fn test_scout_no_workspace_one_diff_not_relevant_member() -> Result<(), crate::error::Error> {
         let diff = vec![Section {
-            file_name: "baz/bar.rs".to_string(),
+            file_name: get_absolute_file_path("baz/bar.rs")?,
             line_start: 0,
             line_end: 10,
         }];
@@ -211,12 +247,12 @@ mod scout_tests {
     fn test_scout_in_workspace() -> Result<(), crate::error::Error> {
         let diff = vec![
             Section {
-                file_name: "member1/bar.rs".to_string(),
+                file_name: get_absolute_file_path("member1/bar.rs")?,
                 line_start: 0,
                 line_end: 10,
             },
             Section {
-                file_name: "member2/baz.rs".to_string(),
+                file_name: get_absolute_file_path("member2/bar.rs")?,
                 line_start: 0,
                 line_end: 10,
             },
@@ -245,7 +281,7 @@ mod scout_tests {
 
 #[cfg(test)]
 mod intersections_tests {
-    use crate::linter::Span;
+    use crate::linter::{Lint, Location};
     use crate::vcs::Section;
 
     type TestSection = (&'static str, u32, u32);
@@ -302,21 +338,26 @@ mod intersections_tests {
     fn assert_all_files_match(ranges: Vec<(TestSection, TestSection)>) {
         use crate::scout::files_match;
         for range in ranges {
-            let lint = range.0;
-            let section = range.1;
-            let clippy_lint = Span {
-                file_name: String::from(lint.0),
-                line_start: lint.1,
-                line_end: lint.2,
+            let lint_section = range.0;
+            let git_section = range.1;
+            let lint = Lint {
+                message: String::new(),
+                location: Location {
+                    path: String::from(lint_section.0),
+                    lines: [lint_section.1, lint_section.2],
+                },
             };
-            let git_section = Section {
-                file_name: String::from(section.0),
-                line_start: section.1,
-                line_end: section.2,
+            let git = Section {
+                file_name: String::from(git_section.0),
+                line_start: git_section.1,
+                line_end: git_section.2,
             };
             assert!(
-                files_match(&clippy_lint, &git_section),
-                print!("Expected files match for {} and {}", lint.0, section.0)
+                files_match(&lint, &git),
+                print!(
+                    "Expected files match for {} and {}",
+                    lint_section.0, git_section.0
+                )
             );
         }
     }
@@ -324,21 +365,26 @@ mod intersections_tests {
     fn assert_no_files_match(ranges: Vec<(TestSection, TestSection)>) {
         use crate::scout::files_match;
         for range in ranges {
-            let lint = range.0;
-            let section = range.1;
-            let clippy_lint = Span {
-                file_name: String::from(lint.0),
-                line_start: lint.1,
-                line_end: lint.2,
+            let lint_section = range.0;
+            let git_section = range.1;
+            let lint = Lint {
+                message: String::new(),
+                location: Location {
+                    path: String::from(lint_section.0),
+                    lines: [lint_section.1, lint_section.2],
+                },
             };
-            let git_section = Section {
-                file_name: String::from(section.0),
-                line_start: section.1,
-                line_end: section.2,
+            let git = Section {
+                file_name: String::from(git_section.0),
+                line_start: git_section.1,
+                line_end: git_section.2,
             };
             assert!(
-                !files_match(&clippy_lint, &git_section),
-                print!("Expected files match for {} and {}", lint.0, section.0)
+                !files_match(&lint, &git),
+                print!(
+                    "Expected files not to match for {} and {}",
+                    lint_section.0, git_section.0
+                )
             );
         }
     }
@@ -371,19 +417,21 @@ mod intersections_tests {
         }
     }
 
-    fn in_range(lint: (&str, u32, u32), section: (&str, u32, u32)) -> bool {
+    fn in_range(lint_section: (&str, u32, u32), git_section: (&str, u32, u32)) -> bool {
         use crate::scout::lines_in_range;
-        let clippy_lint = Span {
-            file_name: String::from(lint.0),
-            line_start: lint.1,
-            line_end: lint.2,
+        let lint = Lint {
+            message: String::new(),
+            location: Location {
+                path: String::from(lint_section.0),
+                lines: [lint_section.1, lint_section.2],
+            },
         };
 
         let git_section = Section {
-            file_name: String::from(section.0),
-            line_start: section.1,
-            line_end: section.2,
+            file_name: String::from(git_section.0),
+            line_start: git_section.1,
+            line_end: git_section.2,
         };
-        lines_in_range(&clippy_lint, &git_section)
+        lines_in_range(&lint, &git_section)
     }
 }

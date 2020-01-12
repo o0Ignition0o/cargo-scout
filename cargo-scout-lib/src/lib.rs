@@ -5,3 +5,5 @@ pub mod scout;
 pub mod vcs;
 
 pub use error::Error;
+
+mod utils;

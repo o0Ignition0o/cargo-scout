@@ -1,5 +1,6 @@
 use super::*;
 use crate::error::Error;
+use crate::utils::get_absolute_file_path;
 use git2::{Delta, DiffOptions, Repository};
 use std::path::Path;
 
@@ -45,13 +46,16 @@ impl VCS for Git {
                 match delta.status() {
                     Delta::Modified | Delta::Added | Delta::Untracked => {
                         if let Some(file_path) = delta.new_file().path() {
-                            let file_path = file_path.to_string_lossy().to_string();
-                            if file_path.ends_with(".rs") {
-                                sections.push(Section {
-                                    file_name: file_path,
-                                    line_start: hunk.new_start(),
-                                    line_end: hunk.new_start() + hunk.new_lines(),
-                                });
+                            // Path returns the path of the entry relative to the working directory.
+                            // We can get the absolute path
+                            if let Ok(file_name) = get_absolute_file_path(&file_path) {
+                                if file_name.ends_with(".rs") {
+                                    sections.push(Section {
+                                        file_name,
+                                        line_start: hunk.new_start(),
+                                        line_end: hunk.new_start() + hunk.new_lines(),
+                                    });
+                                }
                             }
                         }
                     }
@@ -92,12 +96,12 @@ mod tests {
 
         let expected = vec![
             Section {
-                file_name: "bar.rs".into(),
+                file_name: get_absolute_file_path(&"bar.rs")?,
                 line_start: 1,
                 line_end: 5,
             },
             Section {
-                file_name: "foo.rs".into(),
+                file_name: get_absolute_file_path(&"foo.rs")?,
                 line_start: 1,
                 line_end: 7,
             },
@@ -117,12 +121,12 @@ mod tests {
 
         let expected = vec![
             Section {
-                file_name: "foo.rs".into(),
+                file_name: get_absolute_file_path(&"foo.rs")?,
                 line_start: 1,
                 line_end: 7,
             },
             Section {
-                file_name: "inside/some/dir/bar.rs".into(),
+                file_name: get_absolute_file_path(&"inside/some/dir/bar.rs")?,
                 line_start: 1,
                 line_end: 5,
             },
@@ -147,22 +151,22 @@ mod tests {
 
         let expected = vec![
             Section {
-                file_name: "bar.rs".into(),
+                file_name: get_absolute_file_path(&"bar.rs")?,
                 line_start: 1,
                 line_end: 2,
             },
             Section {
-                file_name: "bar.rs".into(),
+                file_name: get_absolute_file_path(&"bar.rs")?,
                 line_start: 5,
                 line_end: 9,
             },
             Section {
-                file_name: "foo.rs".into(),
+                file_name: get_absolute_file_path(&"foo.rs")?,
                 line_start: 3,
                 line_end: 4,
             },
             Section {
-                file_name: "foo.rs".into(),
+                file_name: get_absolute_file_path(&"foo.rs")?,
                 line_start: 6,
                 line_end: 7,
             },
@@ -182,7 +186,7 @@ mod tests {
             .stage(&["foo.rs", "bar.txt"])?;
 
         let expected = vec![Section {
-            file_name: "foo.rs".into(),
+            file_name: get_absolute_file_path(&"foo.rs")?,
             line_start: 1,
             line_end: 7,
         }];
@@ -204,12 +208,12 @@ mod tests {
 
         let expected = vec![
             Section {
-                file_name: "foo.rs".into(),
+                file_name: get_absolute_file_path(&"foo.rs")?,
                 line_start: 3,
                 line_end: 4,
             },
             Section {
-                file_name: "foo.rs".into(),
+                file_name: get_absolute_file_path(&"foo.rs")?,
                 line_start: 6,
                 line_end: 7,
             },
@@ -242,7 +246,7 @@ mod tests {
                 let sig = repo.signature()?;
                 repo.commit(Some("HEAD"), &sig, &sig, "initial", &tree, &[])?;
             }
-            Ok(RepoFixture { dir, repo })
+            Ok(Self { dir, repo })
         }
 
         pub fn write<P: AsRef<Path>>(self, path: P, test_file: &str) -> Result<Self> {
