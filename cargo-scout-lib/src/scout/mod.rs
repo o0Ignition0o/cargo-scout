@@ -136,7 +136,10 @@ mod scout_tests {
         }
     }
     impl Linter for TestLinter {
-        fn lints(&self, _working_dir: PathBuf) -> Result<Vec<Lint>, crate::error::Error> {
+        fn lints(
+            &self,
+            _working_dir: impl Into<PathBuf>,
+        ) -> Result<Vec<Lint>, crate::error::Error> {
             *self.lints_times_called.borrow_mut() += 1;
             Ok(self.lints.clone())
         }
