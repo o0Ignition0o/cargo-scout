@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::path::PathBuf;
 
 pub mod clippy;
@@ -21,7 +22,7 @@ pub struct Lint {
 }
 
 /// A `Location` has a file name, a start and an end line
-#[derive(PartialEq, Clone, Debug)]
+#[derive(Serialize, PartialEq, Clone, Debug)]
 pub struct Location {
     pub path: String,
     pub lines: [u32; 2],

@@ -25,11 +25,10 @@ before_script:
     fi
 script:
   - cargo fmt -- --check
-  - cargo test --all
-  - cargo clippy --all-targets --tests -- -D clippy::pedantic
-after_success: |
+  - |
     if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
-      USE_SKEPTIC=1 cargo tarpaulin --out Xml
-      bash <(curl -s https://codecov.io/bash)
-      echo "Uploaded code coverage"
+      USE_SKEPTIC=1 cargo tarpaulin --out Xml && bash <(curl -s https://codecov.io/bash) && echo "Uploaded code coverage"
+    else
+      cargo test --all
     fi
+  - cargo clippy --all-targets --tests -- -D clippy::pedantic
