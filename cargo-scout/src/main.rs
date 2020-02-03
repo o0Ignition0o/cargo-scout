@@ -24,7 +24,7 @@ struct FmtOptions {
         short = "b",
         long = "branch",
         value_name = "branch",
-        default_value = "master"
+        default_value = "HEAD"
     )]
     /// Set the target branch
     branch: String,
@@ -54,7 +54,7 @@ struct LintOptions {
         short = "b",
         long = "branch",
         value_name = "branch",
-        default_value = "master"
+        default_value = "HEAD"
     )]
     /// Set the target branch
     branch: String,

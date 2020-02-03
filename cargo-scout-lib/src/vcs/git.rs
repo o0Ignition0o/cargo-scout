@@ -12,7 +12,7 @@ impl Default for Git {
     #[must_use]
     fn default() -> Self {
         Self {
-            target_branch: "master".to_string(),
+            target_branch: "HEAD".to_string(),
         }
     }
 }
