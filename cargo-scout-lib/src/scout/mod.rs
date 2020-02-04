@@ -27,6 +27,7 @@ where
             linter,
         }
     }
+    #[allow(clippy::missing_errors_doc)]
     pub fn run(&self) -> Result<Vec<Lint>, crate::error::Error> {
         let current_dir = std::fs::canonicalize(std::env::current_dir()?)?;
         let diff_sections = self.vcs.sections(current_dir.clone())?;

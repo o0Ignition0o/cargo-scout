@@ -4,6 +4,7 @@ pub mod clippy;
 pub mod rustfmt;
 
 pub trait Linter {
+    #[allow(clippy::missing_errors_doc)]
     fn lints(&self, working_dir: impl Into<PathBuf>) -> Result<Vec<Lint>, crate::error::Error>;
 }
 

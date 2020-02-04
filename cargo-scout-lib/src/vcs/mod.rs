@@ -3,6 +3,7 @@ use crate::error::Error;
 use std::path::Path;
 
 pub trait VCS {
+    #[allow(clippy::missing_errors_doc)]
     fn sections<P>(&self, repo_path: P) -> Result<Vec<Section>, Error>
     where
         P: AsRef<Path>;
