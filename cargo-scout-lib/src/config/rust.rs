@@ -40,6 +40,7 @@ impl CargoConfig {
     /// assert_eq!(vec!["cargo-scout".to_string(), "cargo-scout-lib".to_string()], config.members());
     /// # Ok::<(), cargo_scout_lib::Error>(())
     /// ```
+    #[allow(clippy::missing_errors_doc)]
     pub fn from_manifest_path(p: impl AsRef<Path>) -> Result<Self, crate::error::Error> {
         Ok(Self::from_manifest(cargo_toml::Manifest::from_path(p)?))
     }

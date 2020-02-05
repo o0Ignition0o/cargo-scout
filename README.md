@@ -57,7 +57,7 @@ The linter uses [clippy](https://github.com/rust-lang/rust-clippy) and the forma
 
 Rust nightly: Some commands require a nightly edition of rust, because the features we use aren't available in stable yet ([rustfmt --emit json](https://github.com/rust-lang/rustfmt/issues/3947) and some [cargo clippy features in a workspace setting](https://github.com/rust-lang/cargo/issues/4942)).
 
-We try to keep a close eye to the relevant tracking issues and hope we can switch it to stable soon. If the issues evolved and we didn't notice, please file an issue and let us know !
+We try to keep a close eye to the relevant tracking issues and hope we can switch it to stable soon. If the issues evolved and we didn't notice, please file an issue and let us know!
 
 
 ## How to install
@@ -69,8 +69,8 @@ $ cargo install cargo-scout
 
 Open a shell, go to the project you would like to run the command in, and run cargo-scout, with an optional target branch:
 ```bash
-$ cargo-scout lint # clippy::pedantic lints on a diff with master
-$ cargo-scout fmt # rustfmt lints on a diff with master
+$ cargo-scout lint # clippy::pedantic lints on a diff with HEAD
+$ cargo-scout fmt # rustfmt lints on a diff with HEAD
 ```
 
 Each command and subcommand supports -h and --help:
