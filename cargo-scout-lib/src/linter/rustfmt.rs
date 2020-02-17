@@ -1,13 +1,21 @@
 use crate::error::Error;
+use crate::healer::Healer;
 use crate::linter::{Lint, Linter, Location};
 use crate::utils::get_absolute_file_path;
-use serde::Deserialize;
+use crate::utils::get_relative_file_path;
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Default)]
 pub struct RustFmt {}
+
+#[derive(Serialize)]
+struct FmtLocation {
+    file: String,
+    range: [u32; 2],
+}
 
 impl Linter for RustFmt {
     fn lints(&self, working_dir: impl Into<PathBuf>) -> Result<Vec<Lint>, Error> {
@@ -19,6 +27,53 @@ impl Linter for RustFmt {
         let rustfmt_output = Self::fmt(working_dir)?;
         lints(&rustfmt_output)
     }
+}
+
+impl Healer for RustFmt {
+    // Skipped from code coverage
+    // because an external command
+    // cannot be easily unit tested
+    #[cfg_attr(tarpaulin, skip)]
+    fn heal(&self, lints: Vec<Lint>) -> Result<(), crate::error::Error> {
+        let l = &lints_as_json(&lints)?;
+        let fmt_fix = Command::new("cargo")
+            .args(&[
+                "+nightly",
+                "fmt",
+                "--",
+                "--unstable-features",
+                "--file-lines",
+                l,
+                "--skip-children",
+            ])
+            .output()
+            .expect("failed to run rustfmt");
+
+        if fmt_fix.status.success() {
+            Ok(())
+        } else {
+            Err(crate::error::Error::Command(String::from_utf8(
+                fmt_fix.stderr,
+            )?))
+        }
+    }
+}
+
+fn lints_as_json(lints: &[Lint]) -> Result<String, crate::error::Error> {
+    let locations: Vec<FmtLocation> = lints
+        .iter()
+        .filter_map(|l| {
+            if let Ok(file) = get_relative_file_path(l.location.path.clone()) {
+                Some(FmtLocation {
+                    file,
+                    range: l.location.lines,
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+    Ok(serde_json::to_string(&locations)?)
 }
 
 impl RustFmt {
@@ -183,6 +238,46 @@ mod tests {
 
         assert_eq!(expected_lints, actual_lints);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_lints_as_json() -> Result<(), crate::error::Error> {
+        let expected_output = r#"[{"file":"src/lib.rs","range":[1,2]},{"file":"foo_bar.rs","range":[11,19]},{"file":"baz.rs","range":[1,1]}]"#;
+
+        let lints_to_transform = vec![
+            Lint {
+                message: String::new(),
+                location: Location {
+                    path: get_absolute_file_path("src/lib.rs")?,
+                    lines: [1, 2],
+                },
+            },
+            Lint {
+                message: String::new(),
+                location: Location {
+                    path: get_absolute_file_path("foo_bar.rs")?,
+                    lines: [11, 19],
+                },
+            },
+            Lint {
+                message: String::new(),
+                location: Location {
+                    path: get_absolute_file_path("baz.rs")?,
+                    lines: [1, 1],
+                },
+            },
+            Lint {
+                message: "this one won't parse because the path is not absolute".to_string(),
+                location: Location {
+                    path: "wont_pass.rs".to_string(),
+                    lines: [42, 42],
+                },
+            },
+        ];
+
+        let actual_output = lints_as_json(&lints_to_transform)?;
+        assert_eq!(expected_output, actual_output);
         Ok(())
     }
 }

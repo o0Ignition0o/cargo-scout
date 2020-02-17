@@ -1,9 +1,10 @@
 use crate::config::*;
+use crate::healer::Healer;
 use crate::linter::{Lint, Linter};
 use crate::vcs::*;
 use std::path::PathBuf;
 
-pub struct Scout<V, C, L>
+pub struct Scout<'s, V, C, L>
 where
     V: VCS,
     C: Config,
@@ -11,16 +12,16 @@ where
 {
     vcs: V,
     config: C,
-    linter: L,
+    linter: &'s L,
 }
 
-impl<V, C, L> Scout<V, C, L>
+impl<'s, V, C, L> Scout<'s, V, C, L>
 where
     V: VCS,
     C: Config,
     L: Linter,
 {
-    pub fn new(vcs: V, config: C, linter: L) -> Self {
+    pub fn new(vcs: V, config: C, linter: &'s L) -> Self {
         Self {
             vcs,
             config,
@@ -45,6 +46,26 @@ where
         }
         println!("[Scout] - checking for intersections");
         Ok(lints_from_diff(&lints, &diff_sections))
+    }
+}
+
+pub struct Fixer<H>
+where
+    H: Healer,
+{
+    medic: H,
+}
+
+impl<H> Fixer<H>
+where
+    H: Healer,
+{
+    pub fn new(medic: H) -> Self {
+        Self { medic }
+    }
+    pub fn run(&self, lints: Vec<Lint>) -> Result<(), crate::error::Error> {
+        println!("[Scout] - applying fixes");
+        self.medic.heal(lints)
     }
 }
 
@@ -95,7 +116,6 @@ mod scout_tests {
     use std::cell::RefCell;
     use std::clone::Clone;
     use std::path::{Path, PathBuf};
-    use std::rc::Rc;
     struct TestVCS {
         sections: Vec<Section>,
         sections_called: RefCell<bool>,
@@ -118,20 +138,20 @@ mod scout_tests {
         // Using a RefCell here because lints
         // takes &self and not &mut self.
         // We use usize here because we will compare it to a Vec::len()
-        lints_times_called: Rc<RefCell<usize>>,
+        times_called: RefCell<usize>,
         lints: Vec<Lint>,
     }
     impl TestLinter {
         pub fn new() -> Self {
             Self {
-                lints_times_called: Rc::new(RefCell::new(0)),
+                times_called: RefCell::new(0),
                 lints: Vec::new(),
             }
         }
 
         pub fn with_lints(lints: Vec<Lint>) -> Self {
             Self {
-                lints_times_called: Rc::new(RefCell::new(0)),
+                times_called: RefCell::new(0),
                 lints,
             }
         }
@@ -141,8 +161,14 @@ mod scout_tests {
             &self,
             _working_dir: impl Into<PathBuf>,
         ) -> Result<Vec<Lint>, crate::error::Error> {
-            *self.lints_times_called.borrow_mut() += 1;
+            *self.times_called.borrow_mut() += 1;
             Ok(self.lints.clone())
+        }
+    }
+    impl Healer for TestLinter {
+        fn heal(&self, _lints: Vec<Lint>) -> Result<(), crate::error::Error> {
+            *self.times_called.borrow_mut() += 1;
+            Ok(())
         }
     }
     struct TestConfig {
@@ -166,13 +192,12 @@ mod scout_tests {
         // No members so we won't have to iterate
         let config = TestConfig::new(Vec::new());
         let expected_times_called = 0;
-        let actual_times_called = Rc::clone(&linter.lints_times_called);
-        let scout = Scout::new(vcs, config, linter);
+        let scout = Scout::new(vcs, config, &linter);
         // We don't check for the lints result here.
         // It is already tested in the linter tests
         // and in intersection tests
         let _ = scout.run()?;
-        assert_eq!(expected_times_called, *actual_times_called.borrow());
+        assert_eq!(expected_times_called, *linter.times_called.borrow());
         Ok(())
     }
 
@@ -214,13 +239,12 @@ mod scout_tests {
         // The member matches the file name
         let config = TestConfig::new(vec!["foo".to_string()]);
         let expected_times_called = 1;
-        let actual_times_called = Rc::clone(&linter.lints_times_called);
-        let scout = Scout::new(vcs, config, linter);
+        let scout = Scout::new(vcs, config, &linter);
         // We don't check for the lints result here.
         // It is already tested in the linter tests
         // and in intersection tests
         let actual_lints_from_diff = scout.run()?;
-        assert_eq!(expected_times_called, *actual_times_called.borrow());
+        assert_eq!(expected_times_called, *linter.times_called.borrow());
         assert_eq!(expected_lints_from_diff, actual_lints_from_diff);
         Ok(())
     }
@@ -237,13 +261,12 @@ mod scout_tests {
         // The member does not match the file name
         let config = TestConfig::new(vec!["foo".to_string()]);
         let expected_times_called = 0;
-        let actual_times_called = Rc::clone(&linter.lints_times_called);
-        let scout = Scout::new(vcs, config, linter);
+        let scout = Scout::new(vcs, config, &linter);
         // We don't check for the lints result here.
         // It is already tested in the linter tests
         // and in intersection tests
         let _ = scout.run()?;
-        assert_eq!(expected_times_called, *actual_times_called.borrow());
+        assert_eq!(expected_times_called, *linter.times_called.borrow());
         Ok(())
     }
 
@@ -271,14 +294,27 @@ mod scout_tests {
         ]);
         // We should run the linter on member1 and member2
         let expected_times_called = 2;
-        let actual_times_called = Rc::clone(&linter.lints_times_called);
-        let scout = Scout::new(vcs, config, linter);
+        let scout = Scout::new(vcs, config, &linter);
         // We don't check for the lints result here.
         // It is already tested in the linter tests
         // and in intersection tests
         let _ = scout.run()?;
 
-        assert_eq!(expected_times_called, *actual_times_called.borrow());
+        assert_eq!(expected_times_called, *linter.times_called.borrow());
+        Ok(())
+    }
+
+    #[test]
+    fn test_heal() -> Result<(), crate::error::Error> {
+        let fixer = TestLinter::new();
+        let config = TestConfig::new(Vec::new());
+        let vcs = TestVCS::new(Vec::new());
+
+        let expected_times_called = 1;
+        let scout = Scout::new(vcs, config, &fixer);
+        let lints = scout.run()?;
+        fixer.heal(lints)?;
+        assert_eq!(expected_times_called, *fixer.times_called.borrow());
         Ok(())
     }
 }

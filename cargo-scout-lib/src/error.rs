@@ -18,4 +18,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("Git error: {0}")]
     Git(#[from] git2::Error),
+    #[error("The provided command is invalid.")]
+    InvalidCommand,
+    #[error("Couldn't strip prefix from path: {0}")]
+    StripPrefix(#[from] std::path::StripPrefixError),
 }

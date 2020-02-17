@@ -1,4 +1,5 @@
 use cargo_scout_lib::config::rust::CargoConfig;
+use cargo_scout_lib::healer::Healer;
 use cargo_scout_lib::linter::clippy::Clippy;
 use cargo_scout_lib::linter::rustfmt::RustFmt;
 use cargo_scout_lib::linter::Lint;
@@ -15,7 +16,13 @@ use structopt::StructOpt;
 )]
 enum Command {
     Fmt(FmtOptions),
+    Fix(FixCommand),
     Lint(LintOptions),
+}
+
+#[derive(StructOpt)]
+enum FixCommand {
+    Fmt(LintOptions),
 }
 
 #[derive(Debug, StructOpt)]
@@ -74,8 +81,25 @@ struct LintOptions {
 #[cfg_attr(tarpaulin, skip)]
 fn main() -> Result<(), Error> {
     match Command::from_args() {
+        Command::Fix(opts) => run_fix(opts),
         Command::Fmt(opts) => run_fmt(opts),
         Command::Lint(opts) => run_lint(opts),
+    }
+}
+
+#[cfg_attr(tarpaulin, skip)]
+#[allow(irrefutable_let_patterns)]
+fn run_fix(fix_command: FixCommand) -> Result<(), Error> {
+    if let FixCommand::Fmt(opts) = fix_command {
+        let vcs = Git::with_target(opts.branch);
+        let config = CargoConfig::from_manifest_path(opts.cargo_toml)?;
+        let linter = RustFmt::default();
+
+        let scout = Scout::new(vcs, config, &linter); // TODO: do not consume?
+        let relevant_lints = scout.run()?;
+        linter.heal(relevant_lints)
+    } else {
+        Err(Error::InvalidCommand)
     }
 }
 
@@ -92,7 +116,7 @@ fn run_lint(opts: LintOptions) -> Result<(), Error> {
         .set_all_features(opts.all_features)
         .set_features(opts.features)
         .set_preview(opts.preview);
-    let scout = Scout::new(vcs, config, linter);
+    let scout = Scout::new(vcs, config, &linter);
     let relevant_lints = scout.run()?;
     return_warnings(&relevant_lints, fail_if_errors)
 }
@@ -105,7 +129,7 @@ fn run_fmt(opts: FmtOptions) -> Result<(), Error> {
     let config = CargoConfig::from_manifest_path(opts.cargo_toml)?;
     let linter = RustFmt::default();
 
-    let scout = Scout::new(vcs, config, linter);
+    let scout = Scout::new(vcs, config, &linter);
     let relevant_lints = scout.run()?;
     return_warnings(&relevant_lints, fail_if_errors)
 }
