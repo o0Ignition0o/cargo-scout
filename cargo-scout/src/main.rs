@@ -37,6 +37,7 @@ struct FmtOptions {
 }
 
 #[derive(Debug, StructOpt)]
+#[allow(clippy::struct_excessive_bools)]
 struct LintOptions {
     #[structopt(short = "v", long = "verbose")]
     /// Set the verbosity level

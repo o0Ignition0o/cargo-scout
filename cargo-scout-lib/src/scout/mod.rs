@@ -1,6 +1,6 @@
-use crate::config::*;
+use crate::config::Config;
 use crate::linter::{Lint, Linter};
-use crate::vcs::*;
+use crate::vcs::{Section, VCS};
 use std::path::PathBuf;
 
 pub struct Scout<V, C, L>

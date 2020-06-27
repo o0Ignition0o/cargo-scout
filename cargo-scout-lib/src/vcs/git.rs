@@ -1,4 +1,4 @@
-use super::*;
+use super::{Section, VCS};
 use crate::error::Error;
 use crate::utils::get_absolute_file_path;
 use git2::{Delta, DiffOptions, Repository};

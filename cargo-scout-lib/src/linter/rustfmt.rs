@@ -2,7 +2,6 @@ use crate::error::Error;
 use crate::linter::{Lint, Linter, Location};
 use crate::utils::get_absolute_file_path;
 use serde::Deserialize;
-use serde_json;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -116,7 +115,10 @@ fn display_mismatch(mismatch: &FmtMismatch, path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        display_mismatch, get_absolute_file_path, lints, Error, FmtMismatch, Lint, Location,
+        RustFmt,
+    };
 
     #[test]
     fn test_command_parameters() {

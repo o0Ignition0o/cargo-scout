@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Clippy {
     verbose: bool,
     no_default_features: bool,
@@ -220,7 +221,7 @@ fn lints(clippy_output: &str) -> Vec<linter::Lint> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{get_absolute_file_path, lints, Clippy};
     use crate::error::Error;
     #[test]
     fn test_set_verbose() {
