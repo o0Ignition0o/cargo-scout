@@ -29,7 +29,7 @@ impl RustFmt {
     // Skipped from code coverage
     // because an external command
     // cannot be easily unit tested
-    #[cfg_attr(tarpaulin, skip)]
+    #[cfg(not(tarpaulin_include))]
     fn fmt(path: impl AsRef<Path>) -> Result<String, Error> {
         let fmt_output = Command::new("cargo")
             .current_dir(path)

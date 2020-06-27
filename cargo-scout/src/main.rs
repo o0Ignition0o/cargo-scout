@@ -71,7 +71,7 @@ struct LintOptions {
 }
 
 // There is no logic to test
-#[cfg_attr(tarpaulin, skip)]
+#[cfg(not(tarpaulin_include))]
 fn main() -> Result<(), Error> {
     match Command::from_args() {
         Command::Fmt(opts) => run_fmt(opts),
@@ -79,7 +79,7 @@ fn main() -> Result<(), Error> {
     }
 }
 
-#[cfg_attr(tarpaulin, skip)]
+#[cfg(not(tarpaulin_include))]
 fn run_lint(opts: LintOptions) -> Result<(), Error> {
     let fail_if_errors = opts.without_error;
 
@@ -97,7 +97,7 @@ fn run_lint(opts: LintOptions) -> Result<(), Error> {
     return_warnings(&relevant_lints, fail_if_errors)
 }
 
-#[cfg_attr(tarpaulin, skip)]
+#[cfg(not(tarpaulin_include))]
 fn run_fmt(opts: FmtOptions) -> Result<(), Error> {
     let fail_if_errors = opts.without_error;
 

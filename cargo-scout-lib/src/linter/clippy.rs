@@ -138,7 +138,7 @@ impl Clippy {
     // Skipped from code coverage
     // because an external command
     // cannot be easily unit tested
-    #[cfg_attr(tarpaulin, skip)]
+    #[cfg(not(tarpaulin_include))]
     fn clippy(&self, path: impl AsRef<Path>) -> Result<String, crate::error::Error> {
         let clippy_pedantic_output = Command::new("cargo")
             .current_dir(path)
