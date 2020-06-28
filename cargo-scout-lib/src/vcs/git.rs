@@ -71,7 +71,7 @@ impl VCS for Git {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{get_absolute_file_path, Error, Git, Path, Repository, Section, VCS};
     use std::fs::{self, File};
     use std::io::Write;
     use tempfile::TempDir;

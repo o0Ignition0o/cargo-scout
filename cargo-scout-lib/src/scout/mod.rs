@@ -87,7 +87,7 @@ fn lints_from_diff(lints: &[Lint], diffs: &[Section]) -> Vec<Lint> {
 
 #[cfg(test)]
 mod scout_tests {
-    use super::*;
+    use super::{Scout, Section, VCS};
     use crate::config::Config;
     use crate::error::Error;
     use crate::linter::{Lint, Linter, Location};
