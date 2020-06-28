@@ -140,7 +140,7 @@ fn display_warnings(warnings: &[Lint]) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{return_warnings, Lint};
     use cargo_scout_lib::linter::Location;
     #[test]
     fn test_return_status_with_lints() {
