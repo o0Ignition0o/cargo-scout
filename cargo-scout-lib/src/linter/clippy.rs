@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Clippy {
     verbose: bool,
     no_default_features: bool,
@@ -138,7 +139,7 @@ impl Clippy {
     // Skipped from code coverage
     // because an external command
     // cannot be easily unit tested
-    #[cfg_attr(tarpaulin, skip)]
+    #[cfg(not(tarpaulin_include))]
     fn clippy(&self, path: impl AsRef<Path>) -> Result<String, crate::error::Error> {
         let clippy_pedantic_output = Command::new("cargo")
             .current_dir(path)
@@ -185,6 +186,7 @@ impl Clippy {
         }
     }
 }
+
 #[must_use]
 fn lints(clippy_output: &str) -> Vec<linter::Lint> {
     let mut lints = Vec::new();
@@ -220,8 +222,9 @@ fn lints(clippy_output: &str) -> Vec<linter::Lint> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{get_absolute_file_path, lints, Clippy};
     use crate::error::Error;
+
     #[test]
     fn test_set_verbose() {
         let mut linter = Clippy::default();
@@ -233,6 +236,7 @@ mod tests {
         let l3 = l2.set_verbose(false);
         assert_eq!(false, l3.verbose);
     }
+
     #[test]
     fn test_get_envs() {
         let mut linter = Clippy::default();
@@ -243,6 +247,7 @@ mod tests {
         expected_envs.push(("RUST_BACKTRACE", "full"));
         assert_eq!(expected_envs, verbose_linter.envs());
     }
+
     #[test]
     fn test_get_command_parameters() {
         let mut linter = Clippy::default();
@@ -322,6 +327,7 @@ mod tests {
             .command_parameters()
             .contains(&"foo bar baz"));
     }
+
     #[test]
     fn test_lints() -> Result<(), Error> {
         use crate::linter;
