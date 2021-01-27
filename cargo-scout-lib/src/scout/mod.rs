@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::linter::{Lint, Linter};
 use crate::vcs::{Section, VCS};
+use colored::Colorize;
 use std::path::PathBuf;
 
 pub struct Scout<V, C, L>
@@ -43,7 +44,7 @@ where
         for m in relevant_members {
             lints.extend(self.linter.lints(current_dir.clone().join(m))?);
         }
-        println!("[Scout] - checking for intersections");
+        println!("{}", "[Scout] - checking for intersections".cyan());
         Ok(lints_from_diff(&lints, &diff_sections))
     }
 }

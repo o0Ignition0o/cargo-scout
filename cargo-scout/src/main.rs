@@ -5,6 +5,7 @@ use cargo_scout_lib::linter::Lint;
 use cargo_scout_lib::scout::Scout;
 use cargo_scout_lib::vcs::git::Git;
 use cargo_scout_lib::Error;
+use colored::Colorize;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -113,7 +114,7 @@ fn run_fmt(opts: FmtOptions) -> Result<(), Error> {
 
 fn return_warnings(lints: &[Lint], without_error: bool) -> Result<(), Error> {
     if lints.is_empty() {
-        println!("No issues in your diff, you're good to go!");
+        println!("{}", "No issues in your diff, you're good to go!".green());
         Ok(())
     } else {
         display_warnings(&lints);
@@ -128,13 +129,19 @@ fn return_warnings(lints: &[Lint], without_error: bool) -> Result<(), Error> {
 fn display_warnings(warnings: &[Lint]) {
     for w in warnings {
         for l in w.message.split('\n') {
-            println!("{}", l);
+            println!("{}", l.yellow());
         }
     }
-    if warnings.len() == 1 {
-        println!("Cargo scout found a warning");
+
+    if warnings.is_empty() {
+        println!("{}", "Cargo scout found 0 warnings.".green());
+    } else if warnings.len() == 1 {
+        println!("{}", "Cargo scout found a warning".yellow());
     } else {
-        println!("Cargo scout found {} warnings", warnings.len());
+        println!(
+            "{}",
+            format!("Cargo scout found {} warnings", warnings.len()).yellow()
+        );
     }
 }
 

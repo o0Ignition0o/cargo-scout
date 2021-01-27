@@ -1,6 +1,7 @@
 use super::{Section, VCS};
 use crate::error::Error;
 use crate::utils::get_absolute_file_path;
+use colored::Colorize;
 use git2::{Delta, DiffOptions, Repository};
 use std::path::Path;
 
@@ -29,7 +30,10 @@ impl VCS for Git {
     where
         P: AsRef<Path>,
     {
-        println!("[VCS] - Getting diff with target {}", &self.target_branch);
+        println!(
+            "{}",
+            format!("[VCS] - Getting diff with target {}", &self.target_branch).cyan()
+        );
         let repo = Repository::discover(repo_path)?;
         let tree = repo.revparse_single(&self.target_branch)?.peel_to_tree()?;
         let mut config = DiffOptions::default();

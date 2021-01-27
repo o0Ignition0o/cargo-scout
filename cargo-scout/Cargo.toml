@@ -18,3 +18,4 @@ edition = "2018"
 [dependencies]
 cargo-scout-lib = { path = "../cargo-scout-lib" }
 structopt = "0.3.5"
+colored = "2"

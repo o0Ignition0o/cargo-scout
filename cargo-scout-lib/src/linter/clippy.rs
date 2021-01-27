@@ -1,5 +1,6 @@
 use crate::linter;
 use crate::utils::get_absolute_file_path;
+use colored::Colorize;
 use serde::Deserialize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -58,8 +59,12 @@ impl linter::Linter for Clippy {
     ) -> Result<Vec<linter::Lint>, crate::error::Error> {
         let working_dir = working_dir.into();
         println!(
-            "[Clippy] - getting lints for directory {}",
-            &working_dir.to_str().unwrap_or("<no directory>")
+            "{}",
+            format!(
+                "[Clippy] - getting lints for directory {}",
+                &working_dir.to_str().unwrap_or("<no directory>")
+            )
+            .cyan()
         );
         self.clippy(working_dir)
             .map(|clippy_output| lints(clippy_output.as_ref()))
