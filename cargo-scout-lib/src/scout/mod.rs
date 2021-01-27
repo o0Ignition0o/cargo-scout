@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::linter::{Lint, Linter};
 use crate::vcs::{Section, VCS};
+use cargo_scout_macros::info;
 use colored::Colorize;
 use std::path::PathBuf;
 
@@ -44,7 +45,7 @@ where
         for m in relevant_members {
             lints.extend(self.linter.lints(current_dir.clone().join(m))?);
         }
-        println!("{}", "[Scout] - checking for intersections".cyan());
+        info!("[Scout] - checking for intersections");
         Ok(lints_from_diff(&lints, &diff_sections))
     }
 }

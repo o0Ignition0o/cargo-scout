@@ -1,5 +1,6 @@
 use crate::linter;
 use crate::utils::get_absolute_file_path;
+use cargo_scout_macros::{error, info};
 use colored::Colorize;
 use serde::Deserialize;
 use std::io::{self, Write};
@@ -58,13 +59,9 @@ impl linter::Linter for Clippy {
         working_dir: impl Into<PathBuf>,
     ) -> Result<Vec<linter::Lint>, crate::error::Error> {
         let working_dir = working_dir.into();
-        println!(
-            "{}",
-            format!(
-                "[Clippy] - getting lints for directory {}",
-                &working_dir.to_str().unwrap_or("<no directory>")
-            )
-            .cyan()
+        info!(
+            "[Clippy] - getting lints for directory {}",
+            &working_dir.to_str().unwrap_or("<no directory>")
         );
         self.clippy(working_dir)
             .map(|clippy_output| lints(clippy_output.as_ref()))
@@ -154,7 +151,7 @@ impl Clippy {
             .expect("failed to run clippy pedantic");
 
         if self.verbose {
-            println!(
+            info!(
                 "{}",
                 String::from_utf8(clippy_pedantic_output.stdout.clone())?
             );
@@ -162,8 +159,8 @@ impl Clippy {
         if clippy_pedantic_output.status.success() {
             Ok(String::from_utf8(clippy_pedantic_output.stdout)?)
         } else if self.verbose {
-            println!("Clippy run failed");
-            println!("cleaning and building with full backtrace");
+            error!("Clippy run failed");
+            info!("cleaning and building with full backtrace");
             let _ = Command::new("cargo")
                 .args(&["clean"])
                 .envs(self.envs())
