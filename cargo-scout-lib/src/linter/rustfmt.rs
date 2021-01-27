@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::linter::{Lint, Linter, Location};
 use crate::utils::get_absolute_file_path;
+use cargo_scout_macros::info;
 use colored::Colorize;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
@@ -12,13 +13,9 @@ pub struct RustFmt {}
 impl Linter for RustFmt {
     fn lints(&self, working_dir: impl Into<PathBuf>) -> Result<Vec<Lint>, Error> {
         let working_dir = working_dir.into();
-        println!(
-            "{}",
-            format!(
-                "[RustFmt] - checking format for directory {}",
-                &working_dir.to_str().unwrap_or("<no directory>")
-            )
-            .cyan()
+        info!(
+            "[RustFmt] - checking format for directory {}",
+            &working_dir.to_str().unwrap_or("<no directory>")
         );
         let rustfmt_output = Self::fmt(working_dir)?;
         lints(&rustfmt_output)
