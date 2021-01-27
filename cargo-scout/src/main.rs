@@ -133,9 +133,7 @@ fn display_warnings(warnings: &[Lint]) {
         }
     }
 
-    if warnings.is_empty() {
-        println!("{}", "Cargo scout found 0 warnings.".green());
-    } else if warnings.len() == 1 {
+    if warnings.len() == 1 {
         println!("{}", "Cargo scout found a warning".yellow());
     } else {
         println!(
